@@ -27,32 +27,42 @@ if (!cached) {
 }
 
 async function dbConnect() {
+  const timestamp = new Date().toISOString();
+  
   if (cached?.conn) {
-    return cached.conn;
+    // Check if the connection is still open (1 = connected)
+    if (mongoose.connection.readyState === 1) {
+      return cached.conn;
+    }
+    console.log(`[${timestamp}] [NEW_CODE_V3] Connection exists but state is ${mongoose.connection.readyState}. Resetting...`);
+    cached.conn = null;
+    cached.promise = null;
   }
 
   if (!cached?.promise) {
     const opts = {
       bufferCommands: false,
-      serverSelectionTimeoutMS: 10000, // Increased to 10s for slow cold starts
+      serverSelectionTimeoutMS: 15000, 
+      connectTimeoutMS: 15000,
+      heartbeatFrequencyMS: 10000,
       socketTimeoutMS: 45000,
-      family: 4, // Force IPv4 to avoid Vercel IPv6 issues
+      family: 4, 
+      maxPoolSize: 10,
     };
 
-    // Diagnostic logging (masked for security)
     const maskedUri = MONGODB_URI!.replace(/\/\/.*@/, "//***:***@");
-    console.log(`Attempting connection to: ${maskedUri}`);
+    console.log(`[${timestamp}] [NEW_CODE_V3] Connecting to: ${maskedUri}`);
 
     cached!.promise = mongoose.connect(MONGODB_URI!, opts).then((mongoose: any) => {
-      console.log("MongoDB Connected Successfully");
+      console.log(`[${timestamp}] [NEW_CODE_V3] MongoDB Connected Successfully`);
       return mongoose;
     }).catch((err: any) => {
-      console.error("MongoDB Connection Error Details:", {
+      console.error(`[${timestamp}] [NEW_CODE_V3] MongoDB Error:`, {
         message: err.message,
-        name: err.name,
-        code: err.code,
-        uri_prefix: MONGODB_URI?.substring(0, 15)
+        reason: err.reason?.type || "unknown",
+        code: err.code
       });
+      cached!.promise = null; // Important: Clear promise so we can retry
       throw err;
     });
   }
