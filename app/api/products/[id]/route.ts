@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+export const dynamic = "force-dynamic";
 import { getProductById } from "@/lib/mock-products";
 
 export async function GET(
