@@ -54,8 +54,20 @@ const domains = [
 ];
 
 export default async function HomePage() {
-  await dbConnect();
-  const featuredProducts = await Product.find({ isFeatured: true, isActive: true }).limit(6).lean();
+  let featuredProducts = [];
+  try {
+    await dbConnect();
+    // Use a timeout for the query to prevent long hangs
+    featuredProducts = await Product.find({ isFeatured: true, isActive: true })
+      .limit(6)
+      .lean()
+      .maxTimeMS(5000); 
+  } catch (error) {
+    console.error("Database connection/fetch error on HomePage:", error);
+    // Continue with empty products instead of crashing
+  }
+
+  const serializedProducts = JSON.parse(JSON.stringify(featuredProducts));
 
   return (
     <>
@@ -174,8 +186,8 @@ export default async function HomePage() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {featuredProducts.map((product: any) => (
-                  <ProductCard key={String(product._id)} product={JSON.parse(JSON.stringify(product))} />
+                {serializedProducts.map((product: any) => (
+                  <ProductCard key={String(product._id)} product={product} />
                 ))}
               </div>
 
