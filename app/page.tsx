@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, Cpu, Globe, Heart, Zap, BookOpen, Shield, Star } from "lucide-react";
+export const dynamic = "force-dynamic";
 import Navbar from "@/components/ui/Navbar";
 import Footer from "@/components/ui/Footer";
 import ProductCard from "@/components/product/ProductCard";
