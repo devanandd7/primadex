@@ -34,10 +34,15 @@ async function dbConnect() {
   if (!cached?.promise) {
     const opts = {
       bufferCommands: false,
-      serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
+      serverSelectionTimeoutMS: 10000, // Increased to 10s for slow cold starts
+      socketTimeoutMS: 45000,
+      family: 4, // Force IPv4 to avoid Vercel IPv6 issues
     };
 
-    console.log("Connecting to MongoDB...");
+    // Diagnostic logging (masked for security)
+    const maskedUri = MONGODB_URI!.replace(/\/\/.*@/, "//***:***@");
+    console.log(`Attempting connection to: ${maskedUri}`);
+
     cached!.promise = mongoose.connect(MONGODB_URI!, opts).then((mongoose: any) => {
       console.log("MongoDB Connected Successfully");
       return mongoose;
@@ -45,7 +50,8 @@ async function dbConnect() {
       console.error("MongoDB Connection Error Details:", {
         message: err.message,
         name: err.name,
-        code: err.code
+        code: err.code,
+        uri_prefix: MONGODB_URI?.substring(0, 15)
       });
       throw err;
     });
