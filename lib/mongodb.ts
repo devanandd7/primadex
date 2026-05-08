@@ -44,10 +44,6 @@ async function dbConnect() {
       bufferCommands: false,
       serverSelectionTimeoutMS: 15000, 
       connectTimeoutMS: 15000,
-      heartbeatFrequencyMS: 10000,
-      socketTimeoutMS: 45000,
-      family: 4, 
-      maxPoolSize: 10,
     };
 
     const maskedUri = MONGODB_URI!.replace(/\/\/.*@/, "//***:***@");

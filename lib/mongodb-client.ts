@@ -12,10 +12,6 @@ const isValidScheme = uri.startsWith("mongodb://") || uri.startsWith("mongodb+sr
 const options = {
   serverSelectionTimeoutMS: 15000,
   connectTimeoutMS: 15000,
-  family: 4, 
-  tls: true,
-  minPoolSize: 0,
-  maxPoolSize: 10,
 };
 
 let client: MongoClient;
