@@ -40,8 +40,17 @@ if (process.env.NODE_ENV === "development") {
       // In build/production without URI, return a promise that only rejects when awaited
       globalWithMongo._mongoClientPromise = Promise.resolve(null as any); 
     } else {
+      console.log("[MongoDB] Initializing new production client connection...");
       client = new MongoClient(uri, options);
-      globalWithMongo._mongoClientPromise = client.connect();
+      globalWithMongo._mongoClientPromise = client.connect()
+        .then(c => {
+          console.log("[MongoDB] Production connection established successfully.");
+          return c;
+        })
+        .catch(err => {
+          console.error("[MongoDB] Production connection failed:", err.message);
+          throw err;
+        });
     }
   }
   clientPromise = globalWithMongo._mongoClientPromise;

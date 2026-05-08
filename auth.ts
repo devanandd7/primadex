@@ -8,6 +8,7 @@ const hasMongo = !!process.env.MONGODB_URI;
 const authSecret = process.env.AUTH_SECRET || "build-time-fallback-secret";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  trustHost: true,
   secret: authSecret,
   adapter: (hasMongo && !isBuildTime) ? MongoDBAdapter(clientPromise) : undefined,
   providers: [
@@ -42,22 +43,28 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async signIn({ user }) {
       if (!user.email) return;
       
-      const client = await clientPromise;
-      const db = client.db();
-      
-      // Update user with tracking info
-      await db.collection("users").updateOne(
-        { email: user.email },
-        { 
-          $set: { 
-            lastAppUsed: process.env.APP_NAME || "Primadex",
-            lastLoginAt: new Date()
-          },
-          $addToSet: { 
-            authorizedApps: process.env.APP_NAME || "Primadex" 
+      try {
+        const client = await clientPromise;
+        const db = client.db();
+        
+        console.log(`[Auth] Sign-in event for: ${user.email}`);
+        
+        // Update user with tracking info
+        await db.collection("users").updateOne(
+          { email: user.email },
+          { 
+            $set: { 
+              lastAppUsed: process.env.APP_NAME || "Primadex",
+              lastLoginAt: new Date()
+            },
+            $addToSet: { 
+              authorizedApps: process.env.APP_NAME || "Primadex" 
+            }
           }
-        }
-      );
+        );
+      } catch (error) {
+        console.error("[Auth] Database error in signIn event:", error);
+      }
     }
   }
 });
