@@ -15,6 +15,9 @@ export async function POST(req: Request) {
   try {
     const data = await req.json();
     const client = await clientPromise;
+    if (!client) {
+      return NextResponse.json({ error: "Database connection unavailable" }, { status: 503 });
+    }
     const db = client.db();
 
     const config = {
@@ -46,6 +49,9 @@ export async function GET(req: Request) {
     const appId = searchParams.get("appId") || "teachboard";
     
     const client = await clientPromise;
+    if (!client) {
+      return NextResponse.json({ error: "Database connection unavailable" }, { status: 503 });
+    }
     const db = client.db();
     
     const config = await db.collection("app_configs").findOne({ appId });
