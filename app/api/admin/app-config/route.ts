@@ -1,23 +1,27 @@
 import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
-import clientPromise from "@/lib/mongodb-client";
-import { auth } from "@/auth";
 
 export async function POST(req: Request) {
-  const session = await auth();
-  
-  // Security: Check if user is admin
-  const adminEmails = process.env.ADMIN_EMAILS?.split(",") || [];
-  if (!session?.user?.email || !adminEmails.includes(session.user.email)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   try {
+    // Dynamic imports to prevent build-time evaluation issues
+    const { auth } = await import("@/auth");
+    const clientPromise = (await import("@/lib/mongodb-client")).default;
+    
+    const session = await auth();
+    
+    // Security: Check if user is admin
+    const adminEmails = process.env.ADMIN_EMAILS?.split(",") || [];
+    if (!session?.user?.email || !adminEmails.includes(session.user.email)) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const data = await req.json();
     const client = await clientPromise;
+    
     if (!client) {
       return NextResponse.json({ error: "Database connection unavailable" }, { status: 503 });
     }
+    
     const db = client.db();
 
     const config = {
@@ -48,16 +52,19 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const appId = searchParams.get("appId") || "teachboard";
     
+    const clientPromise = (await import("@/lib/mongodb-client")).default;
     const client = await clientPromise;
+    
     if (!client) {
       return NextResponse.json({ error: "Database connection unavailable" }, { status: 503 });
     }
-    const db = client.db();
     
+    const db = client.db();
     const config = await db.collection("app_configs").findOne({ appId });
     
     return NextResponse.json(config || {});
   } catch (error) {
+    console.error("Config fetch error:", error);
     return NextResponse.json({ error: "Failed to fetch configuration" }, { status: 500 });
   }
 }
