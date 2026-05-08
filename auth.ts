@@ -5,8 +5,10 @@ import clientPromise from "./lib/mongodb-client";
 
 const isBuildTime = process.env.NEXT_PHASE === 'phase-production-build';
 const hasMongo = !!process.env.MONGODB_URI;
+const authSecret = process.env.AUTH_SECRET || "build-time-fallback-secret";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  secret: authSecret,
   adapter: (hasMongo && !isBuildTime) ? MongoDBAdapter(clientPromise) : undefined,
   providers: [
     Google({
