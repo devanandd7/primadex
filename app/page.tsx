@@ -54,7 +54,7 @@ const domains = [
 ];
 
 export default async function HomePage() {
-  let featuredProducts = [];
+  let featuredProducts: any[] = [];
   try {
     await dbConnect();
     // Use a timeout for the query to prevent long hangs
