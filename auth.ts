@@ -10,11 +10,16 @@ if (!authSecret && process.env.NODE_ENV === "production") {
   console.warn("[Auth] WARNING: AUTH_SECRET is missing in production!");
 }
 
+console.log(`[Auth] Initializing NextAuth. hasMongo: ${hasMongo}, isBuildTime: ${isBuildTime}`);
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  debug: process.env.NODE_ENV === "development" || true, // Temporarily true to debug Vercel
+  debug: true, 
   trustHost: true,
   secret: authSecret || "fallback-for-build",
-  adapter: (hasMongo && !isBuildTime) ? MongoDBAdapter(clientPromise) : undefined,
+  adapter: (hasMongo && !isBuildTime) ? (() => {
+    console.log("[Auth] Using MongoDB Adapter");
+    return MongoDBAdapter(clientPromise);
+  })() : undefined,
   providers: [
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID,
