@@ -4,7 +4,7 @@ import { MongoDBAdapter } from "@auth/mongodb-adapter";
 import clientPromise from "./lib/mongodb-client";
 
 const isBuildTime = process.env.NEXT_PHASE === 'phase-production-build';
-const hasMongo = !!process.env.MONGODB_URI;
+const hasMongo = !!process.env.MONGODB_URI && (process.env.MONGODB_URI.startsWith("mongodb://") || process.env.MONGODB_URI.startsWith("mongodb+srv://"));
 const authSecret = process.env.AUTH_SECRET || "build-time-fallback-secret";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({

@@ -7,10 +7,12 @@ if (!process.env.MONGODB_URI) {
 }
 
 const uri = process.env.MONGODB_URI?.trim() || "";
+const isValidScheme = uri.startsWith("mongodb://") || uri.startsWith("mongodb+srv://");
+
 const options = {
   serverSelectionTimeoutMS: 15000,
   connectTimeoutMS: 15000,
-  family: 4, // Force IPv4 to avoid SSL/Handshake issues on some networks
+  family: 4, 
 };
 
 let client: MongoClient;
@@ -22,8 +24,9 @@ if (process.env.NODE_ENV === "development") {
   };
 
   if (!globalWithMongo._mongoClientPromise) {
-    if (!uri) {
-      globalWithMongo._mongoClientPromise = Promise.reject(new Error("MONGODB_URI is missing"));
+    if (!isValidScheme) {
+      console.error("[MongoDB] Invalid or missing MONGODB_URI scheme in development.");
+      globalWithMongo._mongoClientPromise = Promise.reject(new Error("Invalid MONGODB_URI scheme"));
     } else {
       client = new MongoClient(uri, options);
       globalWithMongo._mongoClientPromise = client.connect();
@@ -36,8 +39,9 @@ if (process.env.NODE_ENV === "development") {
   };
 
   if (!globalWithMongo._mongoClientPromise) {
-    if (!uri) {
-      // In build/production without URI, return a promise that only rejects when awaited
+    if (!isValidScheme) {
+      // In build/production without valid URI, return a promise that only rejects when awaited
+      console.warn("[MongoDB] Invalid or missing MONGODB_URI scheme. Connection will be skipped.");
       globalWithMongo._mongoClientPromise = Promise.resolve(null as any); 
     } else {
       console.log("[MongoDB] Initializing new production client connection...");
