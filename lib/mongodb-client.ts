@@ -5,7 +5,11 @@ if (!process.env.MONGODB_URI) {
 }
 
 const uri = process.env.MONGODB_URI?.trim();
-const options = {};
+const options = {
+  serverSelectionTimeoutMS: 15000,
+  connectTimeoutMS: 15000,
+  family: 4, // Force IPv4 to avoid SSL/Handshake issues on some networks
+};
 
 let client: MongoClient;
 let clientPromise: Promise<MongoClient>;
@@ -23,9 +27,17 @@ if (process.env.NODE_ENV === "development") {
   }
   clientPromise = globalWithMongo._mongoClientPromise;
 } else {
-  // In production mode, it's best to not use a global variable.
-  client = new MongoClient(uri, options);
-  clientPromise = client.connect();
+  // In production mode, we still want to reuse the client promise if possible
+  // specifically when running in environments that might reuse the container.
+  let globalWithMongo = global as typeof globalThis & {
+    _mongoClientPromise?: Promise<MongoClient>;
+  };
+
+  if (!globalWithMongo._mongoClientPromise) {
+    client = new MongoClient(uri, options);
+    globalWithMongo._mongoClientPromise = client.connect();
+  }
+  clientPromise = globalWithMongo._mongoClientPromise;
 }
 
 // Export a module-scoped MongoClient promise. By doing this in a
