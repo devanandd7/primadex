@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+export const dynamic = "force-dynamic";
 import clientPromise from "@/lib/mongodb-client";
 import { auth } from "@/auth";
 
