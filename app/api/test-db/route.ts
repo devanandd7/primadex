@@ -22,12 +22,13 @@ export async function GET() {
     return NextResponse.json({ error: "MONGODB_URI is missing" }, { status: 500 });
   }
 
-  // Test 1: Mongoose
+  // Test 1: Mongoose (Aggressive)
   try {
     const start = Date.now();
     await mongoose.connect(MONGODB_URI, { 
       serverSelectionTimeoutMS: 5000,
-      family: 4 
+      family: 4,
+      tlsAllowInvalidCertificates: true, // Bypass certificate validation for testing
     });
     results.mongoose = {
       status: "success",
@@ -39,15 +40,18 @@ export async function GET() {
     results.mongoose = {
       status: "error",
       message: err.message,
-      name: err.name,
-      code: err.code
+      name: err.name
     };
   }
 
-  // Test 2: Native MongoDB Driver
+  // Test 2: Native MongoDB Driver (Aggressive)
   try {
     const start = Date.now();
-    const client = new MongoClient(MONGODB_URI);
+    const client = new MongoClient(MONGODB_URI, {
+      tls: true,
+      tlsAllowInvalidCertificates: true,
+      connectTimeoutMS: 5000
+    });
     await client.connect();
     results.mongodb_driver = {
       status: "success",
@@ -58,8 +62,7 @@ export async function GET() {
     results.mongodb_driver = {
       status: "error",
       message: err.message,
-      name: err.name,
-      code: err.code
+      name: err.name
     };
   }
 
