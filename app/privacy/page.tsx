@@ -1,75 +1,86 @@
-import React from 'react';
+import Navbar from "@/components/ui/Navbar";
+import Footer from "@/components/ui/Footer";
+import { Shield, Lock, Eye, FileText } from "lucide-react";
 
-export default function PrivacyPolicy() {
+export default function PrivacyPage() {
   return (
-    <div className="min-h-screen bg-[#fafafa] text-[#1a1a1a] selection:bg-black selection:text-white">
-      <div className="max-w-3xl mx-auto px-6 py-24 md:py-32">
-        <header className="mb-16">
-          <div className="inline-block px-3 py-1 mb-6 text-xs font-medium tracking-widest uppercase border border-black/10 rounded-full">
-            Legal Document
+    <div className="min-h-screen bg-[#050505] text-white selection:bg-brand-accent/30">
+      <Navbar />
+      
+      <main className="pt-32 pb-20 px-6 max-w-4xl mx-auto">
+        <header className="mb-16 text-center">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-brand-accent/30 bg-brand-accent/10 text-brand-accent text-sm font-medium mb-6">
+            <Shield size={14} />
+            Data Protection
           </div>
-          <h1 className="text-5xl md:text-6xl font-serif tracking-tight mb-4 italic">Privacy Policy</h1>
-          <p className="text-sm text-neutral-500 font-mono">Last Updated: May 8, 2026</p>
+          <h1 className="text-5xl font-bold tracking-tight mb-4">Privacy Policy</h1>
+          <p className="text-white/50 text-lg">Last Updated: May 10, 2026</p>
         </header>
 
-        <article className="space-y-12 leading-relaxed text-lg text-neutral-800">
-          <section>
-            <h2 className="text-2xl font-serif mb-4 text-black border-b border-black/5 pb-2">1. Introduction</h2>
+        <div className="space-y-12 prose prose-invert prose-base max-w-none text-white/70 leading-relaxed">
+          <section className="bg-white/5 border border-white/10 rounded-[32px] p-8 md:p-12">
+            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+              <Eye className="text-brand-accent" />
+              Information We Collect
+            </h2>
             <p>
-              Welcome to Primadex. We respect your privacy and are committed to protecting your personal data. 
-              This privacy policy will inform you as to how we look after your personal data when you visit our 
-              website and use our services.
+              Primadex collects minimal information necessary to provide our services. This includes:
+            </p>
+            <ul className="list-disc pl-6 space-y-2 mt-4">
+              <li><strong>Google Account Info:</strong> Name, email address, and profile picture provided via Google OAuth.</li>
+              <li><strong>Usage Data:</strong> Information about which products you browse or purchase.</li>
+              <li><strong>Technical Data:</strong> IP address, browser type, and device information for security and performance monitoring.</li>
+            </ul>
+          </section>
+
+          <section className="p-8">
+            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+              <Lock className="text-brand-accent" />
+              How We Use Your Data
+            </h2>
+            <p>
+              Your data is used exclusively to:
+            </p>
+            <ul className="list-disc pl-6 space-y-2 mt-4">
+              <li>Authenticating your identity and managing your account.</li>
+              <li>Providing access to purchased products and services.</li>
+              <li>Improving our platform's user experience through analytics.</li>
+              <li>Ensuring the security of our ecosystem.</li>
+            </ul>
+            <p className="mt-6 text-brand-accent font-medium">
+              We never sell your personal data to third parties.
             </p>
           </section>
 
-          <section>
-            <h2 className="text-2xl font-serif mb-4 text-black border-b border-black/5 pb-2">2. The Data We Collect</h2>
+          <section className="bg-white/5 border border-white/10 rounded-[32px] p-8 md:p-12">
+            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+              <FileText className="text-brand-accent" />
+              Data Security & Retention
+            </h2>
             <p>
-              When you authenticate using Google, we collect the following information to verify your identity and provide our services:
+              We implement industry-standard security measures to protect your information. Your data is stored securely in our encrypted MongoDB clusters. 
             </p>
-            <ul className="mt-4 list-disc list-inside space-y-2 pl-4 marker:text-black">
-              <li>Email address</li>
-              <li>Basic Profile Information (Name, Profile Picture)</li>
-            </ul>
             <p className="mt-4">
-              We do not collect or store any other personal information from your Google account.
+              We retain your information as long as your account is active. You can request account deletion at any time by contacting our support team at <span className="text-white font-medium">support@primadex.online</span>.
             </p>
           </section>
 
-          <section>
-            <h2 className="text-2xl font-serif mb-4 text-black border-b border-black/5 pb-2">3. How We Use Your Data</h2>
+          <section className="p-8">
+            <h2 className="text-2xl font-bold text-white mb-6">Google User Data</h2>
             <p>
-              We use your data strictly for:
-            </p>
-            <ul className="mt-4 list-disc list-inside space-y-2 pl-4 marker:text-black">
-              <li>User authentication and account verification.</li>
-              <li>Personalizing your experience across the Primadex ecosystem.</li>
-              <li>Ensuring the security of our platform.</li>
-            </ul>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-serif mb-4 text-black border-b border-black/5 pb-2">4. Data Sharing</h2>
-            <p>
-              Primadex does not sell, trade, or otherwise transfer your personal data to third parties. 
-              Your information is stored securely in our centralized database and is only accessed by 
-              applications within the Primadex ecosystem that you have explicitly authorized.
+              Primadex's use of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy#additional_requirements_for_specific_api_scopes" className="text-brand-accent hover:underline" target="_blank" rel="noopener noreferrer">Google API Service User Data Policy</a>, including the Limited Use requirements.
             </p>
           </section>
 
-          <section>
-            <h2 className="text-2xl font-serif mb-4 text-black border-b border-black/5 pb-2">5. Your Rights</h2>
-            <p>
-              You have the right to request the deletion of your account and associated data at any time. 
-              To do so, please contact us at support@primadex.com.
+          <section className="pt-8 border-t border-white/10 text-center">
+            <p className="text-sm text-white/40">
+              By using Primadex, you agree to the terms outlined in this Privacy Policy.
             </p>
           </section>
-        </article>
+        </div>
+      </main>
 
-        <footer className="mt-24 pt-12 border-t border-black/10 text-sm text-neutral-500">
-          &copy; {new Date().getFullYear()} Primadex. All rights reserved.
-        </footer>
-      </div>
+      <Footer />
     </div>
   );
 }

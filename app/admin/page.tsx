@@ -156,7 +156,7 @@ export default function AdminDashboard() {
                   <LayoutGrid size={24} className="text-white" />
                 </div>
                 <h3 className="text-xl font-bold mb-1">Primadex Assets</h3>
-                <p className="text-xs text-white/50 leading-relaxed">Manage marketplace products, AI analysis, and asset listings.</p>
+                <p className="text-xs text-white/50 leading-relaxed">Manage products, AI analysis, and asset listings.</p>
               </div>
             </div>
           </Link>

@@ -51,7 +51,7 @@ export default function ProductDetailsPage({ params }: { params: any }) {
         <main className="pt-40 pb-20 px-6 text-center">
           <h1 className="text-4xl font-bold mb-4">Asset Not Found</h1>
           <p className="text-white/50 mb-8">The requested product could not be found in our database.</p>
-          <Link href="/products" className="text-brand-accent hover:underline">Return to Marketplace</Link>
+          <Link href="/products" className="text-brand-accent hover:underline">Return to Products</Link>
         </main>
         <Footer />
       </div>
@@ -85,7 +85,7 @@ export default function ProductDetailsPage({ params }: { params: any }) {
           className="inline-flex items-center gap-2 text-white/40 hover:text-white mb-12 transition-colors group"
         >
           <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
-          Back to Marketplace
+          Back to Products
         </Link>
         
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-16">

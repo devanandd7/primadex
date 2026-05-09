@@ -25,6 +25,12 @@ export default function Footer() {
               <Link href="/blog" className="text-brand-muted hover:text-white transition-colors">
                 Blog
               </Link>
+              <Link href="/privacy" className="text-brand-muted hover:text-white transition-colors">
+                Privacy
+              </Link>
+              <Link href="/terms" className="text-brand-muted hover:text-white transition-colors">
+                Terms
+              </Link>
             </div>
           </div>
 

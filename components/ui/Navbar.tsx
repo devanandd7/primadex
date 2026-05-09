@@ -23,15 +23,17 @@ export default function Navbar() {
 
           <nav className="hidden sm:flex items-center gap-6 text-sm">
             <Link href="/products" className="text-brand-muted hover:text-white transition-colors">
-              Marketplace
+              Products
             </Link>
             
             {session ? (
               <div className="flex items-center gap-4">
                 {/* Admin Link if applicable */}
-                <Link href="/admin" className="text-brand-muted hover:text-white transition-colors">
-                  Admin
-                </Link>
+                {(session.user as any)?.isAdmin && (
+                  <Link href="/admin" className="text-brand-muted hover:text-white transition-colors">
+                    Admin
+                  </Link>
+                )}
                 
                 <div className="flex items-center gap-3 pl-4 border-l border-brand-border">
                   <div className="w-8 h-8 rounded-full bg-brand-accent/20 border border-brand-accent/30 flex items-center justify-center overflow-hidden">

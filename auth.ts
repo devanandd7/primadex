@@ -40,6 +40,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       }
       return true;
     },
+    async session({ session, token, user }) {
+      // Add isAdmin to the session object
+      const adminEmails = process.env.ADMIN_EMAILS?.split(",") || [];
+      if (session.user && session.user.email) {
+        (session.user as any).isAdmin = adminEmails.includes(session.user.email);
+      }
+      return session;
+    },
   },
   pages: {
     signIn: "/auth/signin",

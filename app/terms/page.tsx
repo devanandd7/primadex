@@ -1,64 +1,80 @@
-import React from 'react';
+import Navbar from "@/components/ui/Navbar";
+import Footer from "@/components/ui/Footer";
+import { FileText, Shield, Scale, AlertCircle } from "lucide-react";
 
 export default function TermsOfService() {
   return (
-    <div className="min-h-screen bg-[#fafafa] text-[#1a1a1a] selection:bg-black selection:text-white">
-      <div className="max-w-3xl mx-auto px-6 py-24 md:py-32">
-        <header className="mb-16">
-          <div className="inline-block px-3 py-1 mb-6 text-xs font-medium tracking-widest uppercase border border-black/10 rounded-full">
-            Legal Document
+    <div className="min-h-screen bg-[#050505] text-white selection:bg-brand-accent/30">
+      <Navbar />
+      
+      <main className="pt-32 pb-20 px-6 max-w-4xl mx-auto">
+        <header className="mb-16 text-center">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-brand-accent/30 bg-brand-accent/10 text-brand-accent text-sm font-medium mb-6">
+            <Scale size={14} />
+            Legal Agreement
           </div>
-          <h1 className="text-5xl md:text-6xl font-serif tracking-tight mb-4">Terms of Service</h1>
-          <p className="text-sm text-neutral-500 font-mono">Last Updated: May 8, 2026</p>
+          <h1 className="text-5xl font-bold tracking-tight mb-4">Terms of Service</h1>
+          <p className="text-white/50 text-lg">Last Updated: May 10, 2026</p>
         </header>
 
-        <article className="space-y-12 leading-relaxed text-lg text-neutral-800">
-          <section>
-            <h2 className="text-2xl font-serif mb-4 text-black border-b border-black/5 pb-2">1. Acceptance of Terms</h2>
+        <div className="space-y-12 prose prose-invert prose-base max-w-none text-white/70 leading-relaxed">
+          <section className="bg-white/5 border border-white/10 rounded-[32px] p-8 md:p-12">
+            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+              <FileText className="text-brand-accent" />
+              1. Acceptance of Terms
+            </h2>
             <p>
-              By accessing or using Primadex, you agree to be bound by these Terms of Service. 
-              If you do not agree to these terms, please do not use our services.
+              By accessing or using Primadex, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our services. This agreement applies to all visitors, users, and others who access or use the Service.
             </p>
           </section>
 
-          <section>
-            <h2 className="text-2xl font-serif mb-4 text-black border-b border-black/5 pb-2">2. Description of Service</h2>
+          <section className="p-8">
+            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+              <Shield className="text-brand-accent" />
+              2. User Accounts
+            </h2>
             <p>
-              Primadex provides a centralized authentication and resource management ecosystem. 
-              We allow users to manage their identity across multiple integrated applications.
+              When you create an account with us (via Google OAuth), you must provide information that is accurate, complete, and current at all times. Failure to do so constitutes a breach of the Terms, which may result in immediate termination of your account on our Service.
             </p>
           </section>
 
-          <section>
-            <h2 className="text-2xl font-serif mb-4 text-black border-b border-black/5 pb-2">3. User Conduct</h2>
+          <section className="bg-white/5 border border-white/10 rounded-[32px] p-8 md:p-12">
+            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+              <Scale className="text-brand-accent" />
+              3. Intellectual Property
+            </h2>
             <p>
-              You agree to use Primadex only for lawful purposes. You are responsible for all activities 
-              that occur under your account. We reserve the right to terminate accounts that violate 
-              our policies or engage in fraudulent activity.
+              The Service and its original content, features, and functionality are and will remain the exclusive property of Primadex and its licensors. Our trademarks and trade dress may not be used in connection with any product or service without the prior written consent of Primadex.
             </p>
           </section>
 
-          <section>
-            <h2 className="text-2xl font-serif mb-4 text-black border-b border-black/5 pb-2">4. Intellectual Property</h2>
+          <section className="p-8">
+            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+              <AlertCircle className="text-brand-accent" />
+              4. Termination
+            </h2>
             <p>
-              All content, trademarks, and data on Primadex are the property of Primadex. 
-              Unauthorized use of any material on the platform is strictly prohibited.
+              We may terminate or suspend access to our Service immediately, without prior notice or liability, for any reason whatsoever, including without limitation if you breach the Terms. Upon termination, your right to use the Service will immediately cease.
             </p>
           </section>
 
-          <section>
-            <h2 className="text-2xl font-serif mb-4 text-black border-b border-black/5 pb-2">5. Limitation of Liability</h2>
+          <section className="bg-white/5 border border-white/10 rounded-[32px] p-8 md:p-12">
+            <h2 className="text-2xl font-bold text-white mb-6">5. Limitation of Liability</h2>
             <p>
-              Primadex is provided "as is" without any warranties. We are not liable for any direct, 
-              indirect, or incidental damages arising from your use of the service.
+              In no event shall Primadex, nor its directors, employees, partners, agents, suppliers, or affiliates, be liable for any indirect, incidental, special, consequential or punitive damages, including without limitation, loss of profits, data, use, goodwill, or other intangible losses.
             </p>
           </section>
-        </article>
 
-        <footer className="mt-24 pt-12 border-t border-black/10 text-sm text-neutral-500">
-          &copy; {new Date().getFullYear()} Primadex. All rights reserved.
-        </footer>
-      </div>
+          <section className="pt-8 border-t border-white/10 text-center">
+            <p className="text-sm text-white/40">
+              &copy; {new Date().getFullYear()} Primadex. All rights reserved.
+            </p>
+          </section>
+        </div>
+      </main>
+
+      <Footer />
     </div>
   );
 }
+
