@@ -16,16 +16,31 @@ export async function POST(req: Request) {
     }
 
     const data = await req.json();
-    const client = await clientPromise;
+    const appId = data.appId || "teachboard";
+    console.log(`[AdminConfig] 🚀 Received update request for appId: ${appId}`);
+    
+    let client;
+    let targetDb = "primadex"; // Default DB name
+
+    if (appId === "teachboard") {
+      console.log("[AdminConfig] 📡 Switching to TeachBoard Database...");
+      const { getTeachBoardClient } = await import("@/lib/mongodb-teachboard");
+      client = await getTeachBoardClient();
+      targetDb = "primadex"; // Assuming we still use 'primadex' db name inside that cluster
+    } else {
+      const clientPromise = (await import("@/lib/mongodb-client")).default;
+      client = await clientPromise;
+    }
     
     if (!client) {
+      console.error("[AdminConfig] ❌ Database client is null");
       return NextResponse.json({ error: "Database connection unavailable" }, { status: 503 });
     }
     
-    const db = client.db();
-
+    const db = client.db(targetDb);
+    
     const config = {
-      appId: data.appId || "teachboard",
+      appId: appId,
       currentVersion: data.currentVersion,
       downloadUrl: data.downloadUrl,
       updateInfo: data.updateInfo,
@@ -34,15 +49,19 @@ export async function POST(req: Request) {
       lastUpdated: new Date(),
     };
 
-    await db.collection("app_configs").updateOne(
+    console.log(`[AdminConfig] 📝 Saving config: v${config.currentVersion}, HardUpdate: ${config.isHardUpdate}`);
+
+    const result = await db.collection("app_configs").updateOne(
       { appId: config.appId },
       { $set: config },
       { upsert: true }
     );
 
+    console.log(`[AdminConfig] ✅ Success! Database modified. appId: ${config.appId}, Matched: ${result.matchedCount}, Upserted: ${result.upsertedCount}`);
+
     return NextResponse.json({ success: true, config });
   } catch (error) {
-    console.error("Config update error:", error);
+    console.error("[AdminConfig] ❌ FATAL ERROR:", error);
     return NextResponse.json({ error: "Failed to update configuration" }, { status: 500 });
   }
 }
@@ -52,14 +71,22 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const appId = searchParams.get("appId") || "teachboard";
     
-    const clientPromise = (await import("@/lib/mongodb-client")).default;
-    const client = await clientPromise;
+    let client;
+    let targetDb = "primadex";
+
+    if (appId === "teachboard") {
+      const { getTeachBoardClient } = await import("@/lib/mongodb-teachboard");
+      client = await getTeachBoardClient();
+    } else {
+      const clientPromise = (await import("@/lib/mongodb-client")).default;
+      client = await clientPromise;
+    }
     
     if (!client) {
       return NextResponse.json({ error: "Database connection unavailable" }, { status: 503 });
     }
     
-    const db = client.db();
+    const db = client.db(targetDb);
     const config = await db.collection("app_configs").findOne({ appId });
     
     return NextResponse.json(config || {});
