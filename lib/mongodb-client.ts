@@ -8,8 +8,7 @@ const uri = process.env.MONGODB_URI?.trim() || "";
 
 const options = {
   tls: true,
-  tlsAllowInvalidCertificates: false,
-  tlsAllowInvalidHostnames: false,
+  tlsAllowInvalidCertificates: true, // Vercel OpenSSL handshake workaround
   serverSelectionTimeoutMS: 15000,
   connectTimeoutMS: 15000,
 };
