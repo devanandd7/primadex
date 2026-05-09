@@ -44,6 +44,8 @@ async function dbConnect() {
       bufferCommands: false,
       serverSelectionTimeoutMS: 15000, 
       connectTimeoutMS: 15000,
+      tls: true,
+      tlsAllowInvalidCertificates: true,
     };
 
     const maskedUri = MONGODB_URI!.replace(/\/\/.*@/, "//***:***@");
