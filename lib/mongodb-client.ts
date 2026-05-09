@@ -1,15 +1,18 @@
 import { MongoClient, ServerApiVersion } from "mongodb";
 
 if (!process.env.MONGODB_URI) {
-  if (process.env.NODE_ENV === "production") {
-    console.warn('Warning: MONGODB_URI is missing. Database features will fail.');
-  }
+  throw new Error('Invalid/Missing environment variable: "MONGODB_URI"');
 }
 
 const uri = process.env.MONGODB_URI?.trim() || "";
-const isValidScheme = uri.startsWith("mongodb://") || uri.startsWith("mongodb+srv://");
 
 const options = {
+  serverApi: {
+    version: ServerApiVersion.v1,
+    strict: true,
+    deprecationErrors: true,
+  },
+  tls: true,
   serverSelectionTimeoutMS: 15000,
   connectTimeoutMS: 15000,
 };
@@ -18,43 +21,35 @@ let client: MongoClient;
 let clientPromise: Promise<MongoClient>;
 
 if (process.env.NODE_ENV === "development") {
+  // In development mode, use a global variable so that the value
+  // is preserved across module reloads caused by HMR (Hot Module Replacement).
   let globalWithMongo = global as typeof globalThis & {
     _mongoClientPromise?: Promise<MongoClient>;
   };
 
   if (!globalWithMongo._mongoClientPromise) {
-    if (!isValidScheme) {
-      console.error("[MongoDB] Invalid or missing MONGODB_URI scheme in development.");
-      globalWithMongo._mongoClientPromise = Promise.reject(new Error("Invalid MONGODB_URI scheme"));
-    } else {
-      client = new MongoClient(uri, options);
-      globalWithMongo._mongoClientPromise = client.connect();
-    }
+    client = new MongoClient(uri, options);
+    globalWithMongo._mongoClientPromise = client.connect();
   }
   clientPromise = globalWithMongo._mongoClientPromise;
 } else {
+  // In production mode, it's best to not use a global variable, but we use it for Serverless reuse
   let globalWithMongo = global as typeof globalThis & {
     _mongoClientPromise?: Promise<MongoClient>;
   };
 
   if (!globalWithMongo._mongoClientPromise) {
-    if (!isValidScheme) {
-      // In build/production without valid URI, return a promise that only rejects when awaited
-      console.warn("[MongoDB] Invalid or missing MONGODB_URI scheme. Connection will be skipped.");
-      globalWithMongo._mongoClientPromise = Promise.resolve(null as any); 
-    } else {
-      console.log("[MongoDB] Initializing new production client connection...");
-      client = new MongoClient(uri, options);
-      globalWithMongo._mongoClientPromise = client.connect()
-        .then(c => {
-          console.log("[MongoDB] Production connection established successfully.");
-          return c;
-        })
-        .catch(err => {
-          console.error("[MongoDB] Production connection failed:", err.message);
-          throw err;
-        });
-    }
+    console.log("[MongoDB] Initializing production connection with ServerApi v1...");
+    client = new MongoClient(uri, options);
+    globalWithMongo._mongoClientPromise = client.connect()
+      .then(c => {
+        console.log("[MongoDB] Connected successfully.");
+        return c;
+      })
+      .catch(err => {
+        console.error("[MongoDB] Connection failed:", err.message);
+        throw err;
+      });
   }
   clientPromise = globalWithMongo._mongoClientPromise;
 }
