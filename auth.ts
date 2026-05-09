@@ -13,13 +13,9 @@ if (!authSecret && process.env.NODE_ENV === "production") {
 console.log(`[Auth] Initializing NextAuth. hasMongo: ${hasMongo}, isBuildTime: ${isBuildTime}`);
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  debug: true, 
   trustHost: true,
-  secret: authSecret || "fallback-for-build",
-  adapter: (hasMongo && !isBuildTime) ? (() => {
-    console.log("[Auth] Using MongoDB Adapter");
-    return MongoDBAdapter(clientPromise);
-  })() : undefined,
+  secret: authSecret,
+  adapter: (hasMongo && !isBuildTime) ? MongoDBAdapter(clientPromise) : undefined,
   providers: [
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID,

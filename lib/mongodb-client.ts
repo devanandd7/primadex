@@ -25,7 +25,7 @@ if (process.env.NODE_ENV === "development") {
   }
   clientPromise = globalWithMongo._mongoClientPromise;
 } else {
-  // Production: connect directly as per modern Serverless best practices for the adapter
+  // Production: connect directly
   clientPromise = new MongoClient(uri, options).connect();
 }
 
