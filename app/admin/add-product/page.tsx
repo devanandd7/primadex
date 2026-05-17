@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { 
   Plus, X, Loader2, CheckCircle, Upload, Image as ImageIcon, 
   Video, Briefcase, Tag, DollarSign, Layers, Link as LinkIcon,
-  ChevronLeft, LayoutGrid, Sparkles, GripVertical, Shield, FileText
+  ChevronLeft, LayoutGrid, Sparkles, GripVertical, FileText, Send
 } from "lucide-react";
 import { motion, Reorder, useDragControls } from "framer-motion";
 import ReactMarkdown from "react-markdown";
@@ -63,6 +63,28 @@ export default function AddProductPage() {
   const [success, setSuccess] = useState(false);
   const [productId, setProductId] = useState<string | null>(null);
   const [error, setError] = useState("");
+
+  // AI Co-pilot State Variables
+  const [isCopilotOpen, setIsCopilotOpen] = useState(false);
+  const [copilotTemplate, setCopilotTemplate] = useState("saas");
+  const [copilotInput, setCopilotInput] = useState("");
+  const [copilotAttachedFileName, setCopilotAttachedFileName] = useState("");
+  const [copilotAttachedText, setCopilotAttachedText] = useState("");
+  const [copilotGeneratedMarkdown, setCopilotGeneratedMarkdown] = useState("");
+  const [isGeneratingCopilot, setIsGeneratingCopilot] = useState(false);
+  const [isInserting, setIsInserting] = useState(false);
+  const [chatMessages, setChatMessages] = useState<Array<{ sender: "user" | "ai"; text: string; isListing?: boolean }>>([
+    {
+      sender: "ai",
+      text: "Hello! I am your AI Asset Co-pilot. Choose a target category template, paste raw notes, or attach a .txt/.md file. I will draft a rich, SEO-optimized product listing and auto-fill your admin form in one click! 🚀"
+    }
+  ]);
+  const copilotFileInputRef = useRef<HTMLInputElement>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages]);
 
   const [form, setForm] = useState({
     name: "",
@@ -173,6 +195,133 @@ export default function AddProductPage() {
       }
     }
   }, []);
+
+  // AI Co-pilot Action Handlers
+  const handleCopilotFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      setCopilotAttachedFileName(file.name);
+      setCopilotAttachedText(text);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleRemoveCopilotFile = () => {
+    setCopilotAttachedFileName("");
+    setCopilotAttachedText("");
+    if (copilotFileInputRef.current) copilotFileInputRef.current.value = "";
+  };
+
+  const handleSendCopilotMessage = async () => {
+    if (!copilotInput.trim() && !copilotAttachedText) return;
+
+    const userPrompt = copilotInput.trim();
+    let messageText = userPrompt;
+    if (copilotAttachedFileName) {
+      messageText = `[Attached: ${copilotAttachedFileName}]\n\n${userPrompt}`;
+    }
+
+    // Add user message to chat feed
+    setChatMessages((prev) => [...prev, { sender: "user", text: messageText }]);
+    setCopilotInput("");
+    setIsGeneratingCopilot(true);
+
+    try {
+      const selectedCategoryLabel = CATEGORIES.find(c => c.id === copilotTemplate)?.label || copilotTemplate;
+      
+      let aiContext = `Target Product Category: ${selectedCategoryLabel}\n`;
+      if (copilotAttachedText) {
+        aiContext += `\nRaw document contents:\n${copilotAttachedText}\n`;
+      }
+      if (userPrompt) {
+        aiContext += `\nUser Prompt / Requirements:\n${userPrompt}\n`;
+      }
+
+      const formData = new FormData();
+      formData.append("mode", "generate");
+      formData.append("input", aiContext);
+
+      const res = await fetch("/api/admin/ai-analyze", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      // Add AI generated markdown directly to the chat feed
+      setChatMessages((prev) => [...prev, { 
+        sender: "ai", 
+        text: data.content,
+        isListing: true
+      }]);
+      setCopilotGeneratedMarkdown(data.content);
+    } catch (err: any) {
+      setChatMessages((prev) => [...prev, { sender: "ai", text: `Error generating content: ${err.message}` }]);
+    } finally {
+      setIsGeneratingCopilot(false);
+      // Reset staging file attachment
+      setCopilotAttachedFileName("");
+      setCopilotAttachedText("");
+      if (copilotFileInputRef.current) copilotFileInputRef.current.value = "";
+    }
+  };
+
+  const handleInsertCopilotResult = async (markdownText: string) => {
+    const textToParse = markdownText || copilotGeneratedMarkdown;
+    if (!textToParse) return;
+    setIsInserting(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("mode", "analyze_text");
+      formData.append("text", textToParse);
+
+      const res = await fetch("/api/admin/ai-analyze", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      // Map structured response to actual fields, checking arrays or arrays containing strings
+      setForm((prev) => ({
+        ...prev,
+        name: data.name || prev.name,
+        description: data.description || prev.description,
+        longDescription: data.longDescription || prev.longDescription,
+        category: data.category || prev.category,
+        badge: data.badge || prev.badge,
+        type: data.type || prev.type,
+        price: data.price ? String(data.price) : prev.price,
+        features: (data.features && data.features.length > 0) ? data.features : prev.features,
+        techStack: (data.techStack && data.techStack.length > 0) ? data.techStack : prev.techStack,
+        security: data.security || prev.security,
+        support: data.support || prev.support,
+        onboarding: data.onboarding || prev.onboarding,
+        integrations: (data.integrations && data.integrations.length > 0) ? data.integrations : prev.integrations,
+        fileFormats: (data.fileFormats && data.fileFormats.length > 0) ? data.fileFormats : prev.fileFormats,
+        compatibility: data.compatibility || prev.compatibility,
+        techSpecs: data.techSpecs || prev.techSpecs,
+        license: data.license || prev.license,
+        refundPolicy: data.refundPolicy || prev.refundPolicy,
+        trialInfo: data.trialInfo || prev.trialInfo,
+        downloadUrl: data.downloadUrl || prev.downloadUrl,
+      }));
+
+      alert("Form populated successfully with details parsed from markdown!");
+      setIsCopilotOpen(false);
+    } catch (err: any) {
+      alert(`Parsing failure: ${err.message}`);
+    } finally {
+      setIsInserting(false);
+    }
+  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -312,9 +461,20 @@ export default function AddProductPage() {
           <div className="flex flex-col lg:flex-row gap-12 mb-16">
             {/* Left Column: Form */}
             <div className="flex-1 space-y-10">
-              <header>
-                <h1 className="text-4xl font-bold tracking-tight mb-3">Add New Asset</h1>
-                <p className="text-white/50">List your premium software, IOT devices, or medical tech on Primadex.</p>
+              <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-6">
+                <div>
+                  <h1 className="text-4xl font-bold tracking-tight mb-3">Add New Asset</h1>
+                  <p className="text-white/50">List your premium software, IOT devices, or medical tech on Primadex.</p>
+                </div>
+                
+                <button
+                  type="button"
+                  onClick={() => setIsCopilotOpen(true)}
+                  className="flex items-center gap-2.5 px-5 py-3 bg-brand-accent/15 border border-brand-accent/30 rounded-2xl text-brand-accent font-bold hover:bg-brand-accent hover:text-white transition-all duration-300 shadow-lg shadow-brand-accent/5 active:scale-[0.98] group shrink-0"
+                >
+                  <Sparkles size={16} className="animate-pulse group-hover:scale-110 transition-transform" />
+                  AI Detail Copilot
+                </button>
               </header>
 
               {error && (
@@ -394,116 +554,6 @@ export default function AddProductPage() {
                   />
                 </div>
               </section>
-
-              {/* Section 2: Specialized Details (Conditional) */}
-              {(form.category === "saas" || form.category === "subscription") ? (
-                <section className="space-y-6">
-                  <div className="flex items-center gap-2 text-brand-accent mb-2">
-                    <Shield size={20} />
-                    <h2 className="font-bold uppercase tracking-widest text-xs">SaaS & Service Details</h2>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className={LABEL_CLASS}>Security & Compliance</label>
-                      <input
-                        value={form.security}
-                        onChange={(e) => setForm({ ...form, security: e.target.value })}
-                        placeholder="e.g. SOC2, GDPR, 256-bit AES"
-                        className={INPUT_CLASS}
-                      />
-                    </div>
-                    <div>
-                      <label className={LABEL_CLASS}>Support Model</label>
-                      <input
-                        value={form.support}
-                        onChange={(e) => setForm({ ...form, support: e.target.value })}
-                        placeholder="e.g. 24/7 Email & Chat"
-                        className={INPUT_CLASS}
-                      />
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className={LABEL_CLASS}>Onboarding Steps</label>
-                      <textarea
-                        value={form.onboarding}
-                        onChange={(e) => setForm({ ...form, onboarding: e.target.value })}
-                        placeholder="Step 1: Sign up, Step 2: Configure..."
-                        rows={2}
-                        className={INPUT_CLASS}
-                      />
-                    </div>
-                    <div className="md:col-span-2 space-y-3">
-                      <label className={LABEL_CLASS}>Integrations (Available APIs/Tools)</label>
-                      <div className="flex flex-wrap gap-2">
-                        {form.integrations.map((item, i) => (
-                          <div key={i} className="flex items-center gap-2">
-                            <input
-                              value={item}
-                              onChange={(e) => updateArr("integrations", i, e.target.value)}
-                              placeholder="Slack"
-                              className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-brand-accent/50"
-                            />
-                            <button type="button" onClick={() => removeArr("integrations", i)} className="text-white/20 hover:text-red-400"><X size={14} /></button>
-                          </div>
-                        ))}
-                        <button type="button" onClick={() => addArr("integrations")} className="px-3 py-1.5 border border-dashed border-white/20 rounded-lg text-white/40 text-xs hover:text-white transition-colors">Add Tool</button>
-                      </div>
-                    </div>
-                  </div>
-                </section>
-              ) : (
-                <section className="space-y-6">
-                  <div className="flex items-center gap-2 text-brand-accent mb-2">
-                    <Layers size={20} />
-                    <h2 className="font-bold uppercase tracking-widest text-xs">Technical Specifications</h2>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className={LABEL_CLASS}>Compatibility</label>
-                      <input
-                        value={form.compatibility}
-                        onChange={(e) => setForm({ ...form, compatibility: e.target.value })}
-                        placeholder="e.g. Blender 4.0, Node 20"
-                        className={INPUT_CLASS}
-                      />
-                    </div>
-                    <div>
-                      <label className={LABEL_CLASS}>License Type</label>
-                      <input
-                        value={form.license}
-                        onChange={(e) => setForm({ ...form, license: e.target.value })}
-                        placeholder="e.g. Commercial, MIT"
-                        className={INPUT_CLASS}
-                      />
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className={LABEL_CLASS}>Technical Specs (Polys, Latency, etc.)</label>
-                      <input
-                        value={form.techSpecs}
-                        onChange={(e) => setForm({ ...form, techSpecs: e.target.value })}
-                        placeholder="e.g. 50k Polygons, 4K Textures"
-                        className={INPUT_CLASS}
-                      />
-                    </div>
-                    <div className="md:col-span-2 space-y-3">
-                      <label className={LABEL_CLASS}>File Formats Included</label>
-                      <div className="flex flex-wrap gap-2">
-                        {form.fileFormats.map((item, i) => (
-                          <div key={i} className="flex items-center gap-2">
-                            <input
-                              value={item}
-                              onChange={(e) => updateArr("fileFormats", i, e.target.value)}
-                              placeholder=".obj"
-                              className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-brand-accent/50"
-                            />
-                            <button type="button" onClick={() => removeArr("fileFormats", i)} className="text-white/20 hover:text-red-400"><X size={14} /></button>
-                          </div>
-                        ))}
-                        <button type="button" onClick={() => addArr("fileFormats")} className="px-3 py-1.5 border border-dashed border-white/20 rounded-lg text-white/40 text-xs hover:text-white transition-colors">Add Format</button>
-                      </div>
-                    </div>
-                  </div>
-                </section>
-              )}
 
               {/* Section 2: Media & Assets */}
               <section className="space-y-6">
@@ -725,6 +775,15 @@ export default function AddProductPage() {
                     />
                   </div>
                   <div>
+                    <label className={LABEL_CLASS}>Download URL (.exe / package link)</label>
+                    <input
+                      value={form.downloadUrl}
+                      onChange={(e) => setForm({ ...form, downloadUrl: e.target.value })}
+                      placeholder="https://downloads.primadex.online/app.exe"
+                      className={INPUT_CLASS}
+                    />
+                  </div>
+                  <div>
                     <label className={LABEL_CLASS}>Refund Policy</label>
                     <input
                       value={form.refundPolicy}
@@ -889,6 +948,175 @@ export default function AddProductPage() {
             <h2 className="text-3xl font-bold text-white mb-3 tracking-tight">Success!</h2>
             <p className="text-white/50 mb-8 leading-relaxed">Your asset has been saved successfully.</p>
             <div className="w-12 h-1 bg-brand-accent mx-auto rounded-full animate-pulse" />
+          </div>
+        </div>
+      )}
+
+      {isCopilotOpen && (
+        <div className="fixed inset-0 z-50 bg-[#050505]/95 backdrop-blur-xl flex flex-col p-6 overflow-hidden animate-in fade-in zoom-in-95 duration-300">
+          {/* Top Navbar */}
+          <div className="flex items-center justify-between pb-6 border-b border-white/10 mb-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-brand-accent/20 border border-brand-accent/40 rounded-2xl text-brand-accent shadow-lg shadow-brand-accent/10">
+                <Sparkles size={24} className="animate-pulse" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+                  AI Detail Copilot <span className="text-[10px] px-2 py-0.5 bg-brand-accent/20 text-brand-accent border border-brand-accent/30 rounded-full font-semibold uppercase tracking-widest">v3.0</span>
+                </h2>
+                <p className="text-xs text-white/50">Draft premium SEO listings and auto-populate your admin form in seconds.</p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsCopilotOpen(false)}
+              className="p-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 hover:text-white rounded-2xl transition-all flex items-center gap-2 group"
+            >
+              <X size={18} className="group-hover:rotate-90 transition-transform duration-300" />
+              <span className="text-xs font-bold uppercase tracking-wider hidden sm:inline">Dismiss</span>
+            </button>
+          </div>
+
+          {/* Unified Conversational Layout Container */}
+          <div className="flex-1 max-w-4xl mx-auto w-full flex flex-col bg-white/[0.02] border border-white/10 rounded-[32px] overflow-hidden shadow-2xl relative min-h-0">
+            <div className="bg-white/5 py-4 px-6 border-b border-white/10 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles size={16} className="text-brand-accent" />
+                <span className="text-xs font-bold uppercase tracking-widest text-white/70">Co-pilot Conversation Console</span>
+              </div>
+              <span className="text-[10px] text-white/40 font-bold uppercase tracking-wider hidden sm:inline">
+                Tap 'Insert & Autofill' inside listing bubbles to instantly populate the form
+              </span>
+            </div>
+
+            {/* Message History */}
+            <div className="flex-1 p-6 overflow-y-auto space-y-6 thin-scrollbar flex flex-col bg-black/10">
+              {chatMessages.map((msg, i) => (
+                <div
+                  key={i}
+                  className={`flex flex-col ${msg.sender === "user" ? "items-end" : "items-start"}`}
+                >
+                  <div
+                    className={
+                      msg.sender === "user"
+                        ? "bg-gradient-to-r from-brand-accent to-brand-accent/80 text-white rounded-2xl rounded-tr-none px-5 py-4 max-w-[85%] text-sm font-medium shadow-md whitespace-pre-wrap border border-brand-accent/20"
+                        : "bg-white/5 border border-white/10 text-white rounded-2xl rounded-tl-none px-5 py-4 max-w-[90%] text-sm leading-relaxed shadow-md whitespace-pre-wrap flex flex-col w-full"
+                    }
+                  >
+                    {msg.sender === "ai" ? (
+                      <div className="prose prose-invert prose-base max-w-none text-white/85 prose-headings:text-white prose-a:text-brand-accent prose-strong:text-white prose-headings:font-bold prose-headings:mt-4 prose-headings:mb-2 leading-relaxed">
+                        <ReactMarkdown>{msg.text}</ReactMarkdown>
+                      </div>
+                    ) : (
+                      msg.text
+                    )}
+
+                    {/* Auto-fill Action Panel directly inside the AI's listing message bubble! */}
+                    {msg.sender === "ai" && msg.isListing && (
+                      <div className="mt-5 pt-4 border-t border-white/10 w-full flex flex-col sm:flex-row gap-4 items-center justify-between">
+                        <div className="flex items-center gap-2 text-white/50 text-[11px] font-medium">
+                          <CheckCircle size={14} className="text-green-400" />
+                          <span>Listing generated. Ready to insert!</span>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={isInserting}
+                          onClick={() => handleInsertCopilotResult(msg.text)}
+                          className="w-full sm:w-auto px-6 py-3 bg-brand-accent hover:bg-brand-accent/90 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-brand-accent/15 active:scale-[0.98] text-xs uppercase tracking-wider shrink-0"
+                        >
+                          {isInserting ? (
+                            <><Loader2 size={14} className="animate-spin" /> Structuring listing...</>
+                          ) : (
+                            <><CheckCircle size={14} /> Insert & Autofill Form</>
+                          )}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {isGeneratingCopilot && (
+                <div className="flex items-center gap-2.5 text-brand-accent text-xs font-semibold pl-2 animate-pulse">
+                  <Loader2 size={16} className="animate-spin" />
+                  Gemini is drafting your premium product listing details...
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+
+            {/* Staged File Badge */}
+            {copilotAttachedFileName && (
+              <div className="px-6 py-2 bg-brand-accent/10 border-t border-brand-accent/20 text-brand-accent text-xs flex items-center justify-between font-medium">
+                <span className="flex items-center gap-1.5">
+                  <FileText size={14} /> Staged file: <strong>{copilotAttachedFileName}</strong>
+                </span>
+                <button type="button" onClick={handleRemoveCopilotFile} className="text-brand-accent hover:text-white transition-colors">
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+
+            {/* Chat Input Bar */}
+            <div className="p-6 border-t border-white/10 bg-[#080d1a]/50 flex flex-col gap-4">
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-2.5 flex items-center gap-3 relative">
+                
+                {/* File Attachment Button */}
+                <button
+                  type="button"
+                  onClick={() => copilotFileInputRef.current?.click()}
+                  className="p-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-white/50 hover:text-white transition-all flex items-center justify-center shrink-0"
+                  title="Upload raw .txt or .md notes"
+                >
+                  <Plus size={16} />
+                </button>
+                <input
+                  type="file"
+                  ref={copilotFileInputRef}
+                  onChange={handleCopilotFileSelect}
+                  className="hidden"
+                  accept=".txt,.md"
+                />
+
+                {/* Category Template Selector */}
+                <select
+                  value={copilotTemplate}
+                  onChange={(e) => setCopilotTemplate(e.target.value)}
+                  className="px-3 py-2 bg-black/40 border border-white/10 rounded-xl text-xs font-bold text-brand-accent hover:border-brand-accent/50 focus:outline-none cursor-pointer shrink-0"
+                >
+                  {CATEGORIES.map((c) => (
+                    <option key={c.id} value={c.id} className="bg-[#0c1326] text-white">
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Input field */}
+                <input
+                  type="text"
+                  value={copilotInput}
+                  onChange={(e) => setCopilotInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleSendCopilotMessage();
+                    }
+                  }}
+                  placeholder="Describe the asset briefly or attach raw notes..."
+                  className="flex-1 bg-transparent px-3 py-2 text-sm text-white placeholder-white/20 focus:outline-none"
+                />
+
+                {/* Send Button */}
+                <button
+                  type="button"
+                  onClick={handleSendCopilotMessage}
+                  disabled={isGeneratingCopilot || (!copilotInput && !copilotAttachedText)}
+                  className="p-3 bg-brand-accent text-white rounded-xl hover:bg-brand-accent/90 transition-all flex items-center justify-center shrink-0 disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-brand-accent/20"
+                >
+                  {isGeneratingCopilot ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

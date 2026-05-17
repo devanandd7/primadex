@@ -133,7 +133,8 @@ export async function POST(req: Request) {
         "techSpecs": "string (assets)",
         "license": "string (assets)",
         "refundPolicy": "string",
-        "trialInfo": "string"
+        "trialInfo": "string",
+        "downloadUrl": "string (link/URL if found)"
       }
     `;
 

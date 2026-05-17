@@ -4,6 +4,9 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Primadex",
   description: "Full-stack platform UI demo (Primadex).",
+  icons: {
+    icon: "/favicon.ico",
+  },
 };
 
 import SessionWrapper from "@/components/auth/SessionWrapper";

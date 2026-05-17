@@ -5,105 +5,37 @@ import Link from "next/link";
 import { 
   Plus, LayoutGrid, Package, Settings, LogOut, 
   ChevronRight, BarChart3, Users, Globe, ExternalLink,
-  Edit2, Trash2, Eye, Video, Sparkles, FileText, Download, Upload, Zap,
+  Edit2, Trash2, Eye, Video,
   Search, Filter, MoreHorizontal
 } from "lucide-react";
 import Navbar from "@/components/ui/Navbar";
 import Footer from "@/components/ui/Footer";
 import { IProduct } from "@/lib/models/Product";
-import TemplateDownloader from "@/components/admin/TemplateDownloader";
-import ReactMarkdown from "react-markdown";
+
+// Custom Lucide-styled outline SVG component for LinkedIn
+const Linkedin = ({ size = 24, className = "" }: { size?: number; className?: string }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" />
+    <rect x="2" y="9" width="4" height="12" rx="1" />
+    <circle cx="4" cy="4" r="2" />
+  </svg>
+);
+
 
 export default function AdminDashboard() {
   const [products, setProducts] = useState<IProduct[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadingMode, setLoadingMode] = useState<"none" | "import" | "generate" | "generate_blog">("none");
-  const [aiInput, setAiInput] = useState("");
-  const [generatedDoc, setGeneratedDoc] = useState("");
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setLoadingMode("import");
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("mode", "analyze");
-
-    try {
-      const res = await fetch("/api/admin/ai-analyze", {
-        method: "POST",
-        body: formData,
-      });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-
-      // Save to sessionStorage to pre-fill the add-product form
-      sessionStorage.setItem("ai_import_data", JSON.stringify(data));
-      window.location.href = "/admin/add-product?source=ai";
-    } catch (err: any) {
-      alert(err.message);
-    } finally {
-      setLoadingMode("none");
-    }
-  };
-
-  const handleAiGenerate = async (mode: "generate" | "generate_blog" = "generate") => {
-    if (!aiInput) return;
-    setLoadingMode(mode);
-    const formData = new FormData();
-    formData.append("mode", mode);
-    formData.append("input", aiInput);
-
-    try {
-      const res = await fetch("/api/admin/ai-analyze", {
-        method: "POST",
-        body: formData,
-      });
-      const data = await res.json();
-      setGeneratedDoc(data.content);
-    } catch (err: any) {
-      alert(err.message);
-    } finally {
-      setLoadingMode("none");
-    }
-  };
-
-  const downloadDoc = () => {
-    const element = document.createElement("a");
-    const file = new Blob([generatedDoc], { type: 'text/markdown' });
-    element.href = URL.createObjectURL(file);
-    element.download = "ai-asset-details.md";
-    document.body.appendChild(element);
-    element.click();
-  };
-
-  const quickInsert = async () => {
-    if (!generatedDoc) return;
-    setLoadingMode("import");
-
-    try {
-      // We can use a blob to simulate a file upload or just send the text directly if we update the API
-      // For now, let's just send the text directly by updating the API to accept text input for analysis
-      const formData = new FormData();
-      formData.append("mode", "analyze_text");
-      formData.append("text", generatedDoc);
-
-      const res = await fetch("/api/admin/ai-analyze", {
-        method: "POST",
-        body: formData,
-      });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-
-      sessionStorage.setItem("ai_import_data", JSON.stringify(data));
-      window.location.href = "/admin/add-product?source=ai";
-    } catch (err: any) {
-      alert(err.message);
-    } finally {
-      setLoadingMode("none");
-    }
-  };
 
   useEffect(() => {
     fetch("/api/products?category=all")
@@ -146,7 +78,7 @@ export default function AdminDashboard() {
 
         {/* Admin Navigation Hub */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-          <Link href="/admin" className="group">
+          <Link href="/admin/add-product" className="group">
             <div className="p-6 bg-brand-accent/20 border border-brand-accent/40 rounded-[32px] hover:bg-brand-accent/30 transition-all relative overflow-hidden h-full">
               <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:scale-110 transition-transform">
                 <Package size={80} />
@@ -172,6 +104,21 @@ export default function AdminDashboard() {
                 </div>
                 <h3 className="text-xl font-bold mb-1">TeachBoard Admin</h3>
                 <p className="text-xs text-white/50 leading-relaxed">Control software versions, deployments, and hard updates for desktop users.</p>
+              </div>
+            </div>
+          </Link>
+
+          <Link href="/admin/linkedin" className="group">
+            <div className="p-6 bg-[#0a66c2]/10 border border-[#0a66c2]/20 rounded-[32px] hover:bg-[#0a66c2]/20 transition-all relative overflow-hidden h-full">
+              <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:scale-110 transition-transform text-[#0a66c2]">
+                <Linkedin size={80} />
+              </div>
+              <div className="relative z-10">
+                <div className="w-12 h-12 bg-[#0a66c2] rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-[#0a66c2]/20">
+                  <Linkedin size={24} className="text-white" />
+                </div>
+                <h3 className="text-xl font-bold mb-1">LinkedIn Publisher</h3>
+                <p className="text-xs text-white/50 leading-relaxed">Compose and publish text, image, and video content directly to your professional timeline.</p>
               </div>
             </div>
           </Link>
@@ -205,121 +152,6 @@ export default function AdminDashboard() {
             New Asset
           </Link>
         </div>
-
-        {/* AI Quick Tools */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
-          {/* Quick Import */}
-          <div className="bg-gradient-to-br from-brand-accent/10 to-transparent border border-brand-accent/20 rounded-[32px] p-8 relative overflow-hidden group">
-            <div className="absolute -right-10 -top-10 w-40 h-40 bg-brand-accent/10 blur-[80px] group-hover:bg-brand-accent/20 transition-all" />
-            <div className="relative z-10">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="p-3 bg-brand-accent/20 rounded-2xl text-brand-accent">
-                  <Zap size={24} />
-                </div>
-                <h2 className="text-2xl font-bold">Quick Asset Import</h2>
-              </div>
-              <p className="text-white/50 mb-8 text-sm leading-relaxed">
-                Upload your <span className="text-white font-mono">.md</span> or <span className="text-white font-mono">.txt</span> file. Gemini will analyze the content and pre-fill the entire product form for you.
-              </p>
-              
-              <label className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-white/10 rounded-3xl hover:border-brand-accent/40 hover:bg-brand-accent/5 transition-all cursor-pointer group/label">
-                <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center px-4">
-                  {loadingMode === "import" ? (
-                    <div className="animate-spin text-brand-accent mb-3"><Sparkles size={32} /></div>
-                  ) : (
-                    <Upload className="w-10 h-10 text-white/20 group-hover/label:text-brand-accent mb-3 transition-colors" />
-                  )}
-                  <p className="mb-2 text-sm text-white/40">
-                    <span className="font-bold text-white/70">Click to upload</span> or drag and drop
-                  </p>
-                  <p className="text-xs text-white/20 uppercase tracking-widest font-bold">Markdown or Text only</p>
-                </div>
-                <input type="file" className="hidden" accept=".md,.txt" onChange={handleFileUpload} />
-              </label>
-
-              <div className="mt-6">
-                <TemplateDownloader />
-              </div>
-            </div>
-          </div>
-
-          {/* AI Generator */}
-          <div className="bg-white/5 border border-white/10 rounded-[32px] p-8 flex flex-col">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-3 bg-white/10 rounded-2xl text-white">
-                <Sparkles size={24} />
-              </div>
-              <h2 className="text-2xl font-bold">AI Detail Generator</h2>
-            </div>
-            
-            <div className="flex-1 space-y-4">
-              <textarea 
-                value={aiInput}
-                onChange={(e) => setAiInput(e.target.value)}
-                placeholder="Paste raw notes, a link, or a brief idea about the asset..."
-                className="w-full h-32 bg-white/[0.03] border border-white/10 rounded-2xl p-4 text-sm focus:outline-none focus:border-brand-accent/50 transition-all resize-none"
-              />
-              <div className="flex gap-4">
-                <button 
-                  onClick={() => handleAiGenerate("generate")}
-                  disabled={loadingMode !== "none" || !aiInput}
-                  className="w-full py-4 bg-white text-black font-bold rounded-2xl hover:bg-brand-accent hover:text-white transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {loadingMode === "generate" ? "Processing..." : "Generate Professional MD"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Huge Full-Width Preview Section */}
-        {generatedDoc && (
-          <div className="mb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="flex items-center justify-between mb-4 px-2">
-              <h2 className="text-2xl font-bold flex items-center gap-3">
-                <div className="p-2 bg-brand-accent/20 rounded-xl text-brand-accent">
-                  <Sparkles size={20} />
-                </div>
-                AI Result
-              </h2>
-              <div className="flex gap-4">
-                <button 
-                  onClick={quickInsert} 
-                  className="px-6 py-3 bg-brand-accent hover:bg-brand-accent/90 text-white font-bold rounded-2xl transition-all shadow-lg shadow-brand-accent/20 flex items-center gap-2"
-                >
-                  <Zap size={18} /> Quick Insert
-                </button>
-                <button 
-                  onClick={downloadDoc} 
-                  className="px-6 py-3 bg-white/5 hover:bg-white/10 text-white font-bold rounded-2xl transition-all border border-white/10 flex items-center gap-2"
-                >
-                  <Download size={18} /> Download MD
-                </button>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[600px]">
-              <div className="bg-black/40 rounded-[32px] border border-white/10 flex flex-col overflow-hidden shadow-2xl">
-                <div className="bg-white/5 py-4 px-6 border-b border-white/10 text-xs font-bold uppercase tracking-widest text-white/50 flex items-center gap-2">
-                  <FileText size={16} /> Raw Markdown
-                </div>
-                <textarea 
-                  value={generatedDoc}
-                  onChange={(e) => setGeneratedDoc(e.target.value)}
-                  className="flex-1 w-full bg-transparent p-6 text-sm text-white/80 font-mono resize-none focus:outline-none thin-scrollbar leading-relaxed"
-                />
-              </div>
-              <div className="bg-white/5 rounded-[32px] border border-white/10 flex flex-col overflow-hidden shadow-2xl">
-                <div className="bg-white/5 py-4 px-6 border-b border-white/10 text-xs font-bold uppercase tracking-widest text-brand-accent flex items-center gap-2">
-                  <Eye size={16} /> Live Render
-                </div>
-                <div className="flex-1 p-8 overflow-y-auto prose prose-invert prose-base max-w-none text-white/90 thin-scrollbar prose-headings:text-white prose-a:text-brand-accent">
-                  <ReactMarkdown>{generatedDoc}</ReactMarkdown>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Assets List */}
         <div className="bg-white/5 border border-white/10 rounded-[32px] overflow-hidden">
