@@ -63,9 +63,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Post content cannot be empty. Add text or media." }, { status: 400 });
     }
 
-    let imageUrn = "";
+    let mediaUrn = ""; // will hold urn:li:image:... or urn:li:video:...
 
-    // 4. Handle Image Upload using modern /rest/images API
+    // 4. Handle Media Upload
     if (mediaFile && mediaFile.size > 0) {
       const mimeType = mediaFile.type;
       const size = mediaFile.size;
@@ -85,63 +85,139 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Video size exceeds 200MB limit." }, { status: 400 });
       }
 
-      if (isImage) {
-        // ---- Modern Images API (returns urn:li:image:...) ----
-        console.log(`[LinkedInPost] Initializing image upload via modern Images API: ${mediaFile.name}`);
+      const liHeaders = {
+        "Authorization": `Bearer ${accessToken}`,
+        "X-Restli-Protocol-Version": "2.0.0",
+        "Linkedin-Version": "202604",
+        "Content-Type": "application/json"
+      };
 
-        // Step A: Initialize upload to get uploadUrl + image URN
+      if (isImage) {
+        // ── Images API ────────────────────────────────────────────────
+        console.log(`[LinkedInPost] Initializing image upload: ${mediaFile.name}`);
+
         const initRes = await fetch("https://api.linkedin.com/rest/images?action=initializeUpload", {
           method: "POST",
-          headers: {
-            "Authorization": `Bearer ${accessToken}`,
-            "X-Restli-Protocol-Version": "2.0.0",
-            "Linkedin-Version": "202604",
-            "Content-Type": "application/json"
-          },
+          headers: liHeaders,
+          body: JSON.stringify({ initializeUploadRequest: { owner: personUrn } })
+        });
+
+        const initData = await initRes.json();
+        if (!initRes.ok) {
+          console.error("[LinkedInPost] Image init failed:", initData);
+          return NextResponse.json({ error: `Image init failed: ${initData.message || "Unknown error"}` }, { status: 502 });
+        }
+
+        const uploadUrl: string = initData.value?.uploadUrl;
+        mediaUrn = initData.value?.image;
+
+        if (!uploadUrl || !mediaUrn) {
+          console.error("[LinkedInPost] Missing uploadUrl or image URN:", initData);
+          return NextResponse.json({ error: "Failed to get upload URL from LinkedIn." }, { status: 502 });
+        }
+
+        console.log(`[LinkedInPost] Uploading image binary... URN: ${mediaUrn}`);
+
+        const uploadRes = await fetch(uploadUrl, {
+          method: "PUT",
+          headers: { "Authorization": `Bearer ${accessToken}`, "Content-Type": mimeType },
+          body: buffer
+        });
+
+        if (!uploadRes.ok) {
+          console.error("[LinkedInPost] Image upload failed:", await uploadRes.text());
+          return NextResponse.json({ error: "Failed to upload image to LinkedIn." }, { status: 502 });
+        }
+
+        console.log(`[LinkedInPost] Image upload complete. URN: ${mediaUrn}`);
+
+      } else {
+        // ── Videos API (3-step: initialize → chunked upload → finalize) ─
+        console.log(`[LinkedInPost] Initializing video upload: ${mediaFile.name} (${(size / 1024 / 1024).toFixed(1)} MB)`);
+
+        // Step A: Initialize upload
+        const initRes = await fetch("https://api.linkedin.com/rest/videos?action=initializeUpload", {
+          method: "POST",
+          headers: liHeaders,
           body: JSON.stringify({
             initializeUploadRequest: {
-              owner: personUrn
+              owner: personUrn,
+              fileSizeBytes: size,
+              uploadCaptions: false,
+              uploadThumbnail: false
             }
           })
         });
 
         const initData = await initRes.json();
-
         if (!initRes.ok) {
-          console.error("[LinkedInPost] Image upload init failed:", initData);
-          return NextResponse.json({ error: `Image init failed: ${initData.message || "Unknown error"}` }, { status: 502 });
+          console.error("[LinkedInPost] Video init failed:", initData);
+          return NextResponse.json({ error: `Video init failed: ${initData.message || "Unknown error"}` }, { status: 502 });
         }
 
-        const uploadUrl: string = initData.value?.uploadUrl;
-        imageUrn = initData.value?.image;
+        const uploadToken: string = initData.value?.uploadToken ?? "";
+        const uploadInstructions: Array<{ uploadUrl: string; firstByte: number; lastByte: number }> =
+          initData.value?.uploadInstructions || [];
+        mediaUrn = initData.value?.video;
 
-        if (!uploadUrl || !imageUrn) {
-          console.error("[LinkedInPost] Missing uploadUrl or image URN from init response:", initData);
-          return NextResponse.json({ error: "Failed to get upload URL from LinkedIn." }, { status: 502 });
+        // uploadToken can be empty string — that's fine, LinkedIn accepts it in finalizeUpload
+        if (!uploadInstructions.length || !mediaUrn) {
+          console.error("[LinkedInPost] Incomplete video init response:", initData);
+          return NextResponse.json({ error: "Failed to get video upload instructions from LinkedIn." }, { status: 502 });
         }
 
-        console.log(`[LinkedInPost] Got image URN: ${imageUrn}. Uploading binary...`);
+        console.log(`[LinkedInPost] Video URN: ${mediaUrn}. Uploading ${uploadInstructions.length} chunk(s)...`);
 
-        // Step B: Upload the binary
-        const uploadRes = await fetch(uploadUrl, {
-          method: "PUT",
-          headers: {
-            "Authorization": `Bearer ${accessToken}`,
-            "Content-Type": mimeType
-          },
-          body: buffer
+        // Step B: Upload each chunk, collect ETags
+        const uploadedPartIds: string[] = [];
+
+        for (let i = 0; i < uploadInstructions.length; i++) {
+          const { uploadUrl, firstByte, lastByte } = uploadInstructions[i];
+          const chunk = buffer.subarray(firstByte, lastByte + 1);
+
+          console.log(`[LinkedInPost] Uploading chunk ${i + 1}/${uploadInstructions.length} (bytes ${firstByte}-${lastByte})`);
+
+          const chunkRes = await fetch(uploadUrl, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/octet-stream"
+            },
+            body: chunk
+          });
+
+          if (!chunkRes.ok) {
+            console.error(`[LinkedInPost] Chunk ${i + 1} upload failed:`, await chunkRes.text());
+            return NextResponse.json({ error: `Video chunk ${i + 1} upload failed.` }, { status: 502 });
+          }
+
+          // LinkedIn returns ETag per chunk — required for finalize
+          const etag = chunkRes.headers.get("etag") || chunkRes.headers.get("ETag") || "";
+          uploadedPartIds.push(etag);
+          console.log(`[LinkedInPost] Chunk ${i + 1} uploaded. ETag: ${etag}`);
+        }
+
+        // Step C: Finalize upload
+        console.log(`[LinkedInPost] Finalizing video upload...`);
+
+        const finalizeRes = await fetch("https://api.linkedin.com/rest/videos?action=finalizeUpload", {
+          method: "POST",
+          headers: liHeaders,
+          body: JSON.stringify({
+            finalizeUploadRequest: {
+              video: mediaUrn,
+              uploadToken,
+              uploadedPartIds
+            }
+          })
         });
 
-        if (!uploadRes.ok) {
-          const uploadErr = await uploadRes.text();
-          console.error("[LinkedInPost] Image binary upload failed:", uploadErr);
-          return NextResponse.json({ error: "Failed to upload image to LinkedIn servers." }, { status: 502 });
+        if (!finalizeRes.ok) {
+          const finalErr = await finalizeRes.text();
+          console.error("[LinkedInPost] Video finalize failed:", finalErr);
+          return NextResponse.json({ error: "Failed to finalize video upload." }, { status: 502 });
         }
 
-        console.log(`[LinkedInPost] Image upload complete. URN: ${imageUrn}`);
-      } else {
-        // Video: not supported in this flow yet
-        return NextResponse.json({ error: "Video upload is not supported yet. Please post with an image or text only." }, { status: 400 });
+        console.log(`[LinkedInPost] Video upload finalized. URN: ${mediaUrn}`);
       }
     }
 
@@ -156,10 +232,10 @@ export async function POST(req: Request) {
       lifecycleState: "PUBLISHED"
     };
 
-    if (imageUrn) {
+    if (mediaUrn) {
       postBody.content = {
         media: {
-          id: imageUrn   // Must be urn:li:image:... format
+          id: mediaUrn  // urn:li:image:... or urn:li:video:...
         }
       };
     }
