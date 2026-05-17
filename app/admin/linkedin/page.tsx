@@ -5,7 +5,7 @@ import Link from "next/link";
 import { 
   ArrowLeft, Loader2, Link2, LogOut, CheckCircle, 
   AlertCircle, Image, Video, Trash2, ExternalLink, Sparkles,
-  Info, Copy, FileText, ChevronDown, ChevronUp, RefreshCw
+  Info, Copy, FileText, ChevronDown, ChevronUp, RefreshCw, RotateCcw
 } from "lucide-react";
 import Navbar from "@/components/ui/Navbar";
 import Footer from "@/components/ui/Footer";
@@ -30,6 +30,13 @@ const Linkedin = ({ size = 24, className = "" }: { size?: number; className?: st
   </svg>
 );
 
+const PLACEHOLDERS_BY_STYLE: Record<string, string> = {
+  builder: "E.g., Aaj maine humare product Primadex me custom AI LinkedIn post writer feature add kiya. Isse admin click me highly engaging, optimized post generate kr skte hain. Aaj din bhar isko testing me spend kiya and it's working flawlessly! Ab linkedin pe shares increase honge.",
+  launch: "E.g., Primadex is officially live! Humne build kiya hai ek fast, custom, and premium asset manager for modern builders. Key features like visual editor, 3d assets support, instant deploy are ready. Abhi sign up kro primadex.com pe or speed access pao!",
+  thought: "E.g., Maine 5 saal SaaS startup building me spent kiya. Log bolte hain building is hard, but true challenge scaling & marketing me hota hai. Aaj share kr rha hu 3 lessons jo maine hard way se seekha...",
+  viral: "E.g., Kuch months pehle lagta tha ki product fail ho jayega. Budget khatam ho rha tha and servers crash kr rhe the. But humne feedback liya, shift kiya core value pe. Aaj humare 10k active developers hain..."
+};
+
 export default function LinkedInPublisherPage() {
   // Connection state
   const [checkingConnection, setCheckingConnection] = useState(true);
@@ -51,6 +58,16 @@ export default function LinkedInPublisherPage() {
   const [copiedRedirect, setCopiedRedirect] = useState(false);
   const [oauthError, setOauthError] = useState<string | null>(null);
   const [oauthSuccess, setOauthSuccess] = useState(false);
+
+  // AI Copilot States
+  const [optimizing, setOptimizing] = useState(false);
+  const [showAiMenu, setShowAiMenu] = useState(false);
+  const [selectedAiStyle, setSelectedAiStyle] = useState("builder");
+  const [selectedLanguage, setSelectedLanguage] = useState("hinglish");
+  const [aiOptimizedText, setAiOptimizedText] = useState("");
+  const [showAiPreview, setShowAiPreview] = useState(false);
+  const [originalTextBeforeAi, setOriginalTextBeforeAi] = useState("");
+  const [showRestoreButton, setShowRestoreButton] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [redirectUri, setRedirectUri] = useState("http://localhost:3000/api/admin/linkedin/callback");
@@ -198,6 +215,50 @@ export default function LinkedInPublisherPage() {
     }
   };
 
+  // AI Copilot Optimization
+  const handleAiOptimize = async (style: string, lang: string) => {
+    if (!text.trim()) {
+      alert("AI Copilot use karne ke liye pehle commentary box me kuch raw text likhiye!");
+      return;
+    }
+
+    setOptimizing(true);
+    setSelectedAiStyle(style);
+    setSelectedLanguage(lang);
+    
+    try {
+      const response = await fetch("/api/admin/linkedin/optimize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, style, language: lang })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.optimizedText) {
+        setOriginalTextBeforeAi(text);
+        setText(data.optimizedText);
+        setShowRestoreButton(true);
+        // Clear any old optimization preview states
+        setAiOptimizedText("");
+        setShowAiPreview(false);
+      } else {
+        alert(data.error || "AI optimization failed.");
+      }
+    } catch (err: any) {
+      alert(err.message || "An unexpected error occurred during AI optimization.");
+    } finally {
+      setOptimizing(false);
+    }
+  };
+
+  const restoreOriginalPost = () => {
+    if (originalTextBeforeAi) {
+      setText(originalTextBeforeAi);
+      setShowRestoreButton(false);
+    }
+  };
+
   // Copy Redirect URI to Clipboard
   const copyRedirectUri = () => {
     navigator.clipboard.writeText(redirectUri);
@@ -321,13 +382,13 @@ export default function LinkedInPublisherPage() {
                     </div>
                   </div>
 
-                  <Link
+                  <a
                     href="/api/admin/linkedin/auth"
                     className="w-full py-4 bg-brand-accent hover:bg-brand-accentHover text-white font-bold rounded-2xl transition-all flex items-center justify-center gap-3 shadow-lg shadow-brand-accent/20 hover:scale-[1.01] active:scale-[0.99] font-semibold text-lg"
                   >
                     <Linkedin size={22} />
                     Connect LinkedIn Account
-                  </Link>
+                  </a>
 
                   {/* Dev Helper Drawer Toggle */}
                   <div className="pt-2 border-t border-white/5">
@@ -389,27 +450,162 @@ export default function LinkedInPublisherPage() {
                 </div>
 
                 {/* Share commentary text */}
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-white/60 uppercase tracking-widest block">
-                    Post Commentary
-                  </label>
-                  <textarea
-                    value={text}
-                    onChange={(e) => {
-                      if (e.target.value.length <= 3000) {
-                        setText(e.target.value);
-                        if (publishStatus === "success") setPublishStatus("idle");
-                      }
-                    }}
-                    placeholder="What do you want to share with your professional network? Announce a release, link a product, or write an article..."
-                    className="w-full h-44 bg-white/[0.02] border border-white/10 focus:border-brand-accent/50 focus:ring-1 focus:ring-brand-accent/40 rounded-2xl p-5 text-sm focus:outline-none transition-all resize-none leading-relaxed text-white/90"
-                    disabled={publishing}
-                  />
-                  <div className="flex justify-between text-xs text-white/30 font-mono px-1">
-                    <span>Markdown formatting not supported natively on LinkedIn</span>
-                    <span className={text.length >= 2800 ? "text-amber-400 font-bold" : ""}>
-                      {text.length} / 3000
-                    </span>
+                <div className="space-y-4">
+                  {/* AI Copilot Configuration Dashboard */}
+                  <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-5 space-y-4">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div>
+                        <h4 className="text-xs font-bold text-brand-accent uppercase tracking-widest flex items-center gap-1.5">
+                          <Sparkles size={12} className="animate-pulse" />
+                          AI Copilot Settings
+                        </h4>
+                        <p className="text-[10px] text-white/40 mt-1">Pehle style aur language select karein. Commentary box me dynamic Hinglish guide example dikhega!</p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-3">
+                        {/* Language tabs */}
+                        <div className="flex bg-black/40 border border-white/10 rounded-lg p-0.5">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedLanguage("hinglish")}
+                            className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all ${
+                              selectedLanguage === "hinglish" 
+                                ? "bg-brand-accent text-white shadow-md shadow-brand-accent/20" 
+                                : "text-white/40 hover:text-white/70"
+                            }`}
+                          >
+                            Hinglish
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedLanguage("english")}
+                            className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all ${
+                              selectedLanguage === "english" 
+                                ? "bg-brand-accent text-white shadow-md shadow-brand-accent/20" 
+                                : "text-white/40 hover:text-white/70"
+                            }`}
+                          >
+                            English
+                          </button>
+                        </div>
+
+                        {/* Style selection dropdown */}
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => setShowAiMenu(!showAiMenu)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-bold rounded-lg transition-all focus:outline-none"
+                          >
+                            <span>Style: </span>
+                            <span className="text-brand-accent capitalize">
+                              {selectedAiStyle === "builder" 
+                                ? "Indie Builder" 
+                                : selectedAiStyle === "thought" 
+                                ? "Thought Leadership" 
+                                : selectedAiStyle}
+                            </span>
+                            <ChevronDown size={10} className={`transition-transform duration-200 ${showAiMenu ? "rotate-180" : ""}`} />
+                          </button>
+
+                          {showAiMenu && (
+                            <div className="absolute right-0 mt-2 w-60 bg-[#0d0d0d] border border-white/10 rounded-2xl p-2.5 shadow-2xl z-50 animate-in fade-in slide-in-from-top-1 duration-150 backdrop-blur-md">
+                              <p className="text-[10px] text-white/40 uppercase tracking-wider px-2.5 pb-2 border-b border-white/5 font-bold">Select Style</p>
+                              <div className="space-y-1 mt-1.5">
+                                {[
+                                  { id: "builder", title: "Indie Builder Progress", desc: "Authentic build-in-public ship update." },
+                                  { id: "launch", title: "Product Launch Pitch", desc: "High-converting pitch with hooks." },
+                                  { id: "thought", title: "Thought Leadership", desc: "Educate with professional insights." },
+                                  { id: "viral", title: "Viral Storytelling", desc: "Emotional builder journey style." }
+                                ].map((styleOption) => (
+                                  <button
+                                    key={styleOption.id}
+                                    type="button"
+                                    onClick={() => { setSelectedAiStyle(styleOption.id); setShowAiMenu(false); }}
+                                    className={`w-full text-left px-2.5 py-2 rounded-xl text-xs transition-colors flex flex-col gap-0.5 focus:outline-none ${
+                                      selectedAiStyle === styleOption.id 
+                                        ? "bg-brand-accent/20 text-brand-accent font-bold" 
+                                        : "hover:bg-white/5 text-white/70"
+                                    }`}
+                                  >
+                                    <span className="font-bold">{styleOption.title}</span>
+                                    <span className="text-[10px] text-white/40 leading-tight">{styleOption.desc}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Trigger optimize */}
+                        <button
+                          type="button"
+                          onClick={() => handleAiOptimize(selectedAiStyle, selectedLanguage)}
+                          disabled={optimizing || !text.trim()}
+                          className="px-3 py-1.5 bg-brand-accent hover:bg-brand-accentHover text-white text-xs font-bold rounded-lg transition-all active:scale-95 disabled:opacity-30 disabled:pointer-events-none flex items-center gap-1.5 shadow-lg shadow-brand-accent/15 focus:outline-none"
+                        >
+                          {optimizing ? (
+                            <Loader2 size={12} className="animate-spin" />
+                          ) : (
+                            <Sparkles size={12} />
+                          )}
+                          Optimize Post
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Commentary box & dynamic guide placeholder */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center h-7">
+                      <label className="text-xs font-bold text-white/60 uppercase tracking-widest block">
+                        Commentary Box
+                      </label>
+                      
+                      {showRestoreButton && (
+                        <button
+                          type="button"
+                          onClick={restoreOriginalPost}
+                          className="px-2.5 py-1 bg-brand-accent/10 hover:bg-brand-accent/20 text-brand-accent hover:text-brand-accentHover border border-brand-accent/25 hover:border-brand-accent/45 rounded-lg text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all focus:outline-none cursor-pointer group shadow-lg shadow-brand-accent/5 animate-in slide-in-from-right duration-250 active:scale-95"
+                          title="Undo AI changes and restore your original draft"
+                        >
+                          <RotateCcw size={11} className="transition-transform group-hover:-rotate-45" />
+                          Undo AI Changes
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="relative">
+                      <textarea
+                        value={text}
+                        onChange={(e) => {
+                          setText(e.target.value);
+                          if (publishStatus === "success") setPublishStatus("idle");
+                          setShowRestoreButton(false);
+                        }}
+                        placeholder={PLACEHOLDERS_BY_STYLE[selectedAiStyle] || "Apna content likhein..."}
+                        className={`w-full h-48 bg-white/[0.02] border focus:border-brand-accent/50 focus:ring-1 focus:ring-brand-accent/40 rounded-2xl p-5 text-sm focus:outline-none transition-all resize-none leading-relaxed text-white/90 placeholder-white/20 ${
+                          optimizing 
+                            ? "border-brand-accent/40 bg-brand-accent/[0.01] animate-pulse" 
+                            : "border-white/10"
+                        }`}
+                        disabled={publishing || optimizing}
+                      />
+                      {optimizing && (
+                        <div className="absolute inset-0 bg-black/70 rounded-2xl flex flex-col items-center justify-center gap-3 backdrop-blur-sm animate-in fade-in duration-200">
+                          <Loader2 className="animate-spin text-brand-accent" size={24} />
+                          <span className="text-xs text-white/60 font-bold uppercase tracking-wider">
+                            AI is rewriting in {selectedLanguage.toUpperCase()}...
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex justify-between text-xs text-white/30 font-mono px-1">
+                      <span>Dynamic guides display examples in Hinglish.</span>
+                      <span>
+                        Input size: {text.length} characters (No limit)
+                      </span>
+                    </div>
                   </div>
                 </div>
 

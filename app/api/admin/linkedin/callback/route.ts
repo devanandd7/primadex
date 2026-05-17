@@ -60,23 +60,42 @@ export async function GET(req: Request) {
     const accessToken = tokenData.access_token;
     const expiresIn = tokenData.expires_in;
 
-    // 2. Query user info to fetch sub/name/avatar using the openid profile scope endpoint
+    let personUrn = "";
+    let name = "LinkedIn Profile";
+    let avatar = null;
+
+    // Always fetch real profile — we now always request openid+profile scopes
     const profileResponse = await fetch("https://api.linkedin.com/v2/userinfo", {
-      headers: {
-        "Authorization": `Bearer ${accessToken}`
-      }
+      headers: { "Authorization": `Bearer ${accessToken}` }
     });
 
     if (!profileResponse.ok) {
       const profileError = await profileResponse.text();
       console.error("[LinkedInCallback] Profile fetch failed:", profileError);
-      return NextResponse.redirect(new URL(`/admin/linkedin?error=Failed to retrieve profile`, req.url));
+      return NextResponse.redirect(new URL(`/admin/linkedin?error=Failed to retrieve profile. Make sure 'Sign In with LinkedIn using OpenID Connect' is enabled in your LinkedIn Developer App.`, req.url));
     }
 
     const profileData = await profileResponse.json();
-    const personUrn = `urn:li:person:${profileData.sub}`;
-    const name = `${profileData.given_name || ""} ${profileData.family_name || ""}`.trim() || profileData.name || "LinkedIn User";
-    const avatar = profileData.picture || null;
+    const realUrn = `urn:li:person:${profileData.sub}`;
+    name = `${profileData.given_name || ""} ${profileData.family_name || ""}`.trim() || profileData.name || "LinkedIn User";
+    avatar = profileData.picture || null;
+
+    // Use env override if set, otherwise use the real sub from the token
+    if (process.env.LINKED_PERSON_URN) {
+      personUrn = process.env.LINKED_PERSON_URN;
+      if (!personUrn.startsWith("urn:li:person:")) {
+        personUrn = `urn:li:person:${personUrn}`;
+      }
+      console.log(`[LinkedInCallback] Real sub from token: ${realUrn} | Using env URN override: ${personUrn}`);
+      if (realUrn !== personUrn) {
+        console.warn(`[LinkedInCallback] ⚠️  WARNING: env LINKED_PERSON_URN (${personUrn}) does NOT match the token's real identity (${realUrn}). This will cause 403 errors. Using real token URN instead.`);
+        personUrn = realUrn; // Always use the real token identity to avoid 403
+      }
+    } else {
+      personUrn = realUrn;
+    }
+
+    console.log(`[LinkedInCallback] Linked successfully to: ${name} (${personUrn})`);
 
     // 3. Save to database using clientPromise
     const clientPromise = (await import("@/lib/mongodb-client")).default;
@@ -99,7 +118,6 @@ export async function GET(req: Request) {
       { upsert: true }
     );
 
-    console.log(`[LinkedInCallback] Linked successfully to: ${name} (${personUrn})`);
     return NextResponse.redirect(new URL("/admin/linkedin?success=true", req.url));
   } catch (error: any) {
     console.error("[LinkedInCallback] Fatal callback error:", error);

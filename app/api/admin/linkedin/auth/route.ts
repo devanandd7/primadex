@@ -21,8 +21,11 @@ export async function GET(req: Request) {
     const origin = new URL(req.url).origin;
     const redirectUri = `${origin}/api/admin/linkedin/callback`;
 
-    // Scopes required for OIDC user info + UGC Content posting
-    const scope = "openid profile w_member_social email";
+    // Full scopes needed for modern /rest/posts API.
+    // REQUIRES "Sign In with LinkedIn using OpenID Connect" AND "Share on LinkedIn" 
+    // products to be enabled in LinkedIn Developer Portal → Products tab.
+    // If you get "unauthorized_scope_error", add those products first.
+    const scope = "openid profile email w_member_social";
     const state = "primadex_linked_state"; // Random state key
 
     const authUrl = `https://www.linkedin.com/oauth/v2/authorization?` + 
@@ -32,8 +35,8 @@ export async function GET(req: Request) {
       `state=${state}&` +
       `scope=${encodeURIComponent(scope)}`;
 
-    console.log(`[LinkedInAuth] Redirecting to LinkedIn with redirectUri: ${redirectUri}`);
-    return NextResponse.redirect(authUrl);
+    console.log(`[LinkedInAuth] Redirecting to LinkedIn. Generated URL:\n${authUrl}\n`);
+    return NextResponse.redirect(authUrl, 307);
   } catch (error: any) {
     console.error("[LinkedInAuth] Error initiating OAuth flow:", error);
     return new Response("Internal Server Error", { status: 500 });

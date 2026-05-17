@@ -1,6 +1,31 @@
 import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
+function convertMarkdownBoldToUnicode(str: string): string {
+  if (!str) return "";
+  return str.replace(/\*\*(.*?)\*\*/g, (_, innerText) => {
+    return innerText
+      .split("")
+      .map((char: string) => {
+        const code = char.charCodeAt(0);
+        // Uppercase A-Z (ASCII 65-90) -> Math Sans-Serif Bold (starts at 0x1D5D4)
+        if (code >= 65 && code <= 90) {
+          return String.fromCodePoint(code + 0x1D5D4 - 65);
+        }
+        // Lowercase a-z (ASCII 97-122) -> Math Sans-Serif Bold (starts at 0x1D5EE)
+        if (code >= 97 && code <= 122) {
+          return String.fromCodePoint(code + 0x1D5EE - 97);
+        }
+        // Digits 0-9 (ASCII 48-57) -> Math Sans-Serif Bold (starts at 0x1D7EC)
+        if (code >= 48 && code <= 57) {
+          return String.fromCodePoint(code + 0x1D7EC - 48);
+        }
+        return char;
+      })
+      .join("");
+  });
+}
+
 export async function POST(req: Request) {
   try {
     const { auth } = await import("@/auth");
@@ -30,17 +55,17 @@ export async function POST(req: Request) {
 
     // 3. Parse FormData
     const formData = await req.formData();
-    const text = formData.get("text") as string;
+    const rawText = formData.get("text") as string;
+    const text = convertMarkdownBoldToUnicode(rawText || "");
     const mediaFile = formData.get("media") as File | null;
 
     if (!text && (!mediaFile || mediaFile.size === 0)) {
       return NextResponse.json({ error: "Post content cannot be empty. Add text or media." }, { status: 400 });
     }
 
-    let assetUrn = "";
-    let mediaCategory = "NONE";
+    let imageUrn = "";
 
-    // 4. Handle Media Upload if present
+    // 4. Handle Image Upload using modern /rest/images API
     if (mediaFile && mediaFile.size > 0) {
       const mimeType = mediaFile.type;
       const size = mediaFile.size;
@@ -53,7 +78,6 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Unsupported file type. Only images and videos are supported." }, { status: 400 });
       }
 
-      // Check file size limits
       if (isImage && size > 10 * 1024 * 1024) {
         return NextResponse.json({ error: "Image size exceeds 10MB limit." }, { status: 400 });
       }
@@ -61,120 +85,110 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Video size exceeds 200MB limit." }, { status: 400 });
       }
 
-      const recipe = isImage 
-        ? "urn:li:digitalmediaRecipe:feedshare-image" 
-        : "urn:li:digitalmediaRecipe:feedshare-video";
+      if (isImage) {
+        // ---- Modern Images API (returns urn:li:image:...) ----
+        console.log(`[LinkedInPost] Initializing image upload via modern Images API: ${mediaFile.name}`);
 
-      mediaCategory = isImage ? "IMAGE" : "VIDEO";
+        // Step A: Initialize upload to get uploadUrl + image URN
+        const initRes = await fetch("https://api.linkedin.com/rest/images?action=initializeUpload", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${accessToken}`,
+            "X-Restli-Protocol-Version": "2.0.0",
+            "Linkedin-Version": "202604",
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            initializeUploadRequest: {
+              owner: personUrn
+            }
+          })
+        });
 
-      console.log(`[LinkedInPost] Registering media: ${mediaFile.name} (${mimeType}) with recipe: ${recipe}`);
+        const initData = await initRes.json();
 
-      // Step A: Register the asset with LinkedIn
-      const registerRes = await fetch("https://api.linkedin.com/v2/assets?action=registerUpload", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${accessToken}`,
-          "X-Restli-Protocol-Version": "2.0.0",
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          registerUploadRequest: {
-            recipes: [recipe],
-            owner: personUrn,
-            serviceRelationships: [
-              {
-                relationshipType: "OWNER",
-                identifier: "urn:li:userGeneratedContent"
-              }
-            ]
-          }
-        })
-      });
+        if (!initRes.ok) {
+          console.error("[LinkedInPost] Image upload init failed:", initData);
+          return NextResponse.json({ error: `Image init failed: ${initData.message || "Unknown error"}` }, { status: 502 });
+        }
 
-      const registerData = await registerRes.json();
+        const uploadUrl: string = initData.value?.uploadUrl;
+        imageUrn = initData.value?.image;
 
-      if (!registerRes.ok) {
-        console.error("[LinkedInPost] Media registration failed:", registerData);
-        return NextResponse.json({ error: `Media registration failed: ${registerData.message || "Unknown error"}` }, { status: 502 });
+        if (!uploadUrl || !imageUrn) {
+          console.error("[LinkedInPost] Missing uploadUrl or image URN from init response:", initData);
+          return NextResponse.json({ error: "Failed to get upload URL from LinkedIn." }, { status: 502 });
+        }
+
+        console.log(`[LinkedInPost] Got image URN: ${imageUrn}. Uploading binary...`);
+
+        // Step B: Upload the binary
+        const uploadRes = await fetch(uploadUrl, {
+          method: "PUT",
+          headers: {
+            "Authorization": `Bearer ${accessToken}`,
+            "Content-Type": mimeType
+          },
+          body: buffer
+        });
+
+        if (!uploadRes.ok) {
+          const uploadErr = await uploadRes.text();
+          console.error("[LinkedInPost] Image binary upload failed:", uploadErr);
+          return NextResponse.json({ error: "Failed to upload image to LinkedIn servers." }, { status: 502 });
+        }
+
+        console.log(`[LinkedInPost] Image upload complete. URN: ${imageUrn}`);
+      } else {
+        // Video: not supported in this flow yet
+        return NextResponse.json({ error: "Video upload is not supported yet. Please post with an image or text only." }, { status: 400 });
       }
-
-      const uploadUrl = registerData.value?.uploadMechanism?.["com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest"]?.uploadUrl;
-      assetUrn = registerData.value?.asset;
-
-      if (!uploadUrl || !assetUrn) {
-        console.error("[LinkedInPost] Incomplete asset registration response:", registerData);
-        return NextResponse.json({ error: "Failed to obtain upload URL from LinkedIn." }, { status: 502 });
-      }
-
-      console.log(`[LinkedInPost] Uploading binary data to pre-signed URL...`);
-
-      // Step B: Upload the binary buffer to the pre-signed URL
-      // Note: Omit Bearer token header as S3 URL is pre-signed and will reject auth headers
-      const uploadRes = await fetch(uploadUrl, {
-        method: "PUT",
-        headers: {
-          "Content-Type": mimeType
-        },
-        body: buffer
-      });
-
-      if (!uploadRes.ok) {
-        const uploadErr = await uploadRes.text();
-        console.error("[LinkedInPost] Binary file upload failed:", uploadErr);
-        return NextResponse.json({ error: "Failed to upload file binary data to LinkedIn servers." }, { status: 502 });
-      }
-
-      console.log(`[LinkedInPost] Binary upload complete. Asset URN: ${assetUrn}`);
     }
 
-    // 5. Construct UGC Post Request
-    const ugcPostBody: any = {
+    // 5. Construct Post Request (modern /rest/posts API)
+    const postBody: any = {
       author: personUrn,
-      lifecycleState: "PUBLISHED",
-      specificContent: {
-        "com.linkedin.ugc.ShareContent": {
-          shareCommentary: {
-            text: text || ""
-          },
-          shareMediaCategory: mediaCategory
-        }
+      commentary: text || "",
+      visibility: "PUBLIC",
+      distribution: {
+        feedDistribution: "MAIN_FEED"
       },
-      visibility: {
-        "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"
-      }
+      lifecycleState: "PUBLISHED"
     };
 
-    if (assetUrn) {
-      ugcPostBody.specificContent["com.linkedin.ugc.ShareContent"].media = [
-        {
-          status: "READY",
-          media: assetUrn,
-          title: {
-            text: mediaFile?.name || "Uploaded Media"
-          }
+    if (imageUrn) {
+      postBody.content = {
+        media: {
+          id: imageUrn   // Must be urn:li:image:... format
         }
-      ];
+      };
     }
 
-    console.log(`[LinkedInPost] Submitting UGC Post to LinkedIn...`);
+    console.log(`[LinkedInPost] DEBUG - personUrn: ${personUrn}`);
+    console.log(`[LinkedInPost] DEBUG - postBody:`, JSON.stringify(postBody, null, 2));
+    console.log(`[LinkedInPost] Submitting post to LinkedIn via modern REST API...`);
 
-    const postRes = await fetch("https://api.linkedin.com/v2/ugcPosts", {
+    const postRes = await fetch("https://api.linkedin.com/rest/posts", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${accessToken}`,
         "X-Restli-Protocol-Version": "2.0.0",
+        "Linkedin-Version": "202604",
         "Content-Type": "application/json"
       },
-      body: JSON.stringify(ugcPostBody)
+      body: JSON.stringify(postBody)
     });
 
     // 6. Handle response
     let postUrn = postRes.headers.get("x-restli-id");
     
     if (!postRes.ok) {
-      const postErr = await postRes.json();
-      console.error("[LinkedInPost] Post creation failed:", postErr);
-      return NextResponse.json({ error: `LinkedIn post creation failed: ${postErr.message || "Unknown error"}` }, { status: 502 });
+      const rawErr = await postRes.text();
+      let postErr: any = {};
+      try { postErr = JSON.parse(rawErr); } catch { postErr = { raw: rawErr }; }
+      console.error("[LinkedInPost] Post creation failed (status:", postRes.status, "):", JSON.stringify(postErr, null, 2));
+      console.error("[LinkedInPost] Response headers:", Object.fromEntries(postRes.headers.entries()));
+      return NextResponse.json({ error: `LinkedIn post creation failed: ${postErr.message || postErr.raw || "Unknown error"}` }, { status: 502 });
     }
 
     if (!postUrn) {

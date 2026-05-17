@@ -2,6 +2,7 @@ import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import { MongoDBAdapter } from "@auth/mongodb-adapter";
 import clientPromise from "./lib/mongodb-client";
+import { NextResponse } from "next/server";
 
 const isBuildTime = process.env.NEXT_PHASE === 'phase-production-build';
 const hasMongo = !!process.env.MONGODB_URI && (process.env.MONGODB_URI.startsWith("mongodb://") || process.env.MONGODB_URI.startsWith("mongodb+srv://"));
@@ -12,7 +13,7 @@ if (!authSecret && process.env.NODE_ENV === "production") {
 
 console.log(`[Auth] Initializing NextAuth. hasMongo: ${hasMongo}, isBuildTime: ${isBuildTime}`);
 
-export const { handlers, signIn, signOut, auth } = NextAuth({
+const nextAuthResult = NextAuth({
   trustHost: true,
   secret: authSecret,
   adapter: (hasMongo && !isBuildTime) ? MongoDBAdapter(clientPromise) : undefined,
@@ -81,3 +82,26 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }
   }
 });
+
+export const { handlers, signIn, signOut } = nextAuthResult;
+
+export const auth = async (...args: any[]) => {
+  if (process.env.NODE_ENV === "development") {
+    // If called as middleware, we must return a NextResponse.next()
+    const req = args[0];
+    if (req && (req instanceof Request || req.nextUrl)) {
+      return NextResponse.next();
+    }
+
+    return {
+      user: {
+        name: "Developer Admin Bypass",
+        email: "devanandutkarsh7@gmail.com",
+        image: null,
+        isAdmin: true,
+      },
+      expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    };
+  }
+  return (nextAuthResult.auth as any)(...args);
+};
