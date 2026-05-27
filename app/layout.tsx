@@ -7,6 +7,9 @@ export const metadata: Metadata = {
   icons: {
     icon: "/favicon.ico",
   },
+  verification: {
+    google: "fztlVyPpL-6K_qNR8ORAv2IcNq2j4ToFQ1YAzIF3uk8",
+  },
 };
 
 import SessionWrapper from "@/components/auth/SessionWrapper";

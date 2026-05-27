@@ -65,13 +65,7 @@ export default function PrivacyPage() {
             </p>
           </section>
 
-          <section className="p-8">
-            <h2 className="text-2xl font-bold text-white mb-6">Google User Data</h2>
-            <p>
-              Primadex's use of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy#additional_requirements_for_specific_api_scopes" className="text-brand-accent hover:underline" target="_blank" rel="noopener noreferrer">Google API Service User Data Policy</a>, including the Limited Use requirements.
-            </p>
-          </section>
-
+         
           <section className="pt-8 border-t border-white/10 text-center">
             <p className="text-sm text-white/40">
               By using Primadex, you agree to the terms outlined in this Privacy Policy.
